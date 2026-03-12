@@ -6,6 +6,7 @@ version = "1.0.0"
 # Enable Pyflakes (`F`) and a subset of the pycodestyle (`E`)  codes by default.
 # Unlike Flake8, Ruff doesn't enable all `E` and `F` codes by default.
 # See: https://docs.astral.sh/ruff/rules/
+[tool.ruff.lint]
 select = ["B", "E", "F", "I", "W", "C90", "UP", "ASYNC", "PT", "ARG", "PTH", "SIM", "PLE", "PLW", "RUF"]
 ignore = []
 

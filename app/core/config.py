@@ -1,5 +1,4 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from typing import Optional
 
 
 class Settings(BaseSettings):
@@ -17,7 +16,7 @@ class Settings(BaseSettings):
     POSTGRES_USER: str = "postgres"
     POSTGRES_PASSWORD: str = "postgres"
     POSTGRES_DB: str = "fluentmeet"
-    DATABASE_URL: Optional[str] = None
+    DATABASE_URL: str | None = None
 
     # Redis
     REDIS_HOST: str = "localhost"
@@ -27,10 +26,10 @@ class Settings(BaseSettings):
     KAFKA_BOOTSTRAP_SERVERS: str = "localhost:9092"
 
     # External Services Keys
-    DEEPGRAM_API_KEY: Optional[str] = None
-    DEEPL_API_KEY: Optional[str] = None
-    VOICE_AI_API_KEY: Optional[str] = None
-    OPENAI_API_KEY: Optional[str] = None
+    DEEPGRAM_API_KEY: str | None = None
+    DEEPL_API_KEY: str | None = None
+    VOICE_AI_API_KEY: str | None = None
+    OPENAI_API_KEY: str | None = None
 
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=True)
 
