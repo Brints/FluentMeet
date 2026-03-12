@@ -1,0 +1,49 @@
+# Issue Labeler - labels issues based on title/body content
+
+bug:
+  - '(bug|fix|issue|error|crash|fail|broken)'
+
+enhancement:
+  - '(feature|enhancement|improve|add|new)'
+
+documentation:
+  - '(doc|docs|documentation|readme|guide)'
+
+question:
+  - '(question|how to|help|support|\?)'
+
+ai-ml:
+  - '(stt|tts|speech|voice|translation|translate|whisper|deepgram|deepl|gpt)'
+
+audio-media:
+  - '(audio|webrtc|websocket|ws|stream|signaling)'
+
+event-driven:
+  - '(kafka|zookeeper|event|topic|stream)'
+
+real-time:
+  - '(latency|instant|real-time|glass-to-glass)'
+
+infrastructure:
+  - '(docker|redis|postgres|alembic|migration)'
+
+security:
+  - '(auth|jwt|token|security|vulnerability|private)'
+
+performance:
+  - '(perf|optimization|speed|throughput|latency)'
+
+api:
+  - '(api|endpoint|rest|controller)'
+
+payment:
+  - '(payment|stripe|subscription|billing|invoice)'
+
+email:
+  - '(email|mail|notification|template)'
+
+ci-cd:
+  - '(ci|cd|github action|workflow|pipeline|build|stale|labeler)'
+
+dependencies:
+  - '(dependency|dependencies|upgrade|update|version)'

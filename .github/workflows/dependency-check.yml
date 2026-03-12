@@ -1,0 +1,35 @@
+name: OWASP Dependency Check
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    - cron: '0 0 * * 1' # Weekly on Mondays at midnight
+  workflow_dispatch:
+
+jobs:
+  depcheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Dependency Check
+        uses: dependency-check/dependency-check-action@main
+        id: depcheck
+        with:
+          project: 'FluentMeet'
+          path: '.'
+          format: 'HTML'
+          out: 'reports' # Reports will be saved in the 'reports' directory
+          args: >
+            --failOnCVSS 7
+            --enableRetired
+
+      - name: Upload Test results
+        uses: actions/upload-artifact@v4
+        with:
+          name: DepCheck report
+          path: reports

@@ -1,0 +1,30 @@
+backend:
+  - changed-files:
+    - any-glob-to-any-file: 'app/**/*'
+
+tests:
+  - changed-files:
+    - any-glob-to-any-file: 'tests/**/*'
+
+github-actions:
+  - changed-files:
+    - any-glob-to-any-file: '.github/**/*'
+
+migrations:
+  - changed-files:
+    - any-glob-to-any-file: 'alembic/**/*'
+
+config:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'pyproject.toml'
+      - 'requirements.txt'
+      - '.env.example'
+      - '.gitignore'
+
+devops:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'docker-compose.yml'
+      - 'Dockerfile'
+      - '.dockerignore'

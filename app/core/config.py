@@ -1,6 +1,7 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
 
+
 class Settings(BaseSettings):
     PROJECT_NAME: str = "FluentMeet"
     VERSION: str = "1.0.0"
@@ -32,5 +33,6 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: Optional[str] = None
 
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=True)
+
 
 settings = Settings()
