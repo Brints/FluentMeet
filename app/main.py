@@ -18,7 +18,7 @@ app.add_middleware(
 
 
 @app.get("/health", tags=["health"])
-async def health_check():
+async def health_check() -> dict[str, str]:
     return {"status": "ok", "version": "1.0.0"}
 
 
