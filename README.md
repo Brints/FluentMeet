@@ -148,8 +148,7 @@ pytest
 ### **Test Coverage**
 Generate and view a coverage report:
 ```bash
-pytest --cov=app tests/
-coverage html
+pytest tests/ -v --cov=app --cov-report=html --cov-report=term
 # Open htmlcov/index.html in your browser
 ```
 
