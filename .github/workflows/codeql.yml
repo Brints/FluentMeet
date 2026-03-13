@@ -1,0 +1,62 @@
+name: CodeQL
+
+on:
+  push:
+    branches: [ dev, main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    - cron: '30 1 * * 0'
+
+jobs:
+  analyze:
+    name: Analyze
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+      issues: write
+      pull-requests: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [ 'python' ]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          queries: security-extended,security-and-quality
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{matrix.language}}"
+
+      - name: Notify on failure
+        if: failure() && github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const issue = context.payload.pull_request 
+              ? context.payload.pull_request.number 
+              : (context.payload.issue ? context.payload.issue.number : null);
+            
+            if (issue) {
+              github.rest.issues.createComment({
+                issue_number: issue,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: '⚠️ CodeQL security scan failed. Please check the workflow logs.'
+              });
+            } else {
+              console.log('No issue or PR number found, skipping comment creation');
+            }

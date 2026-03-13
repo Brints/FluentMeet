@@ -1,5 +1,7 @@
 # FluentMeet 🎙️🌐
 
+![CI](https://github.com/afiaa/FluentMeet/actions/workflows/ci.yml/badge.svg)
+
 **"Speak your language, they hear theirs."**
 
 FluentMeet is a state-of-the-art, real-time voice translation video conferencing platform. It eliminates language barriers in global professional collaborations by providing instantaneous, natural-sounding voice translation, allowing participants to communicate naturally in their native tongues.
@@ -146,8 +148,7 @@ pytest
 ### **Test Coverage**
 Generate and view a coverage report:
 ```bash
-pytest --cov=app tests/
-coverage html
+pytest tests/ -v --cov=app --cov-report=html --cov-report=term
 # Open htmlcov/index.html in your browser
 ```
 
