@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 app = FastAPI(
     title="FluentMeet API",
     description="Real-time voice translation video conferencing platform API",
-    version="1.0.0",
+    version="1.1.0",
 )
 
 # Set all CORS enabled origins
@@ -19,7 +19,7 @@ app.add_middleware(
 
 @app.get("/health", tags=["health"])
 async def health_check() -> dict[str, str]:
-    return {"status": "ok", "version": "1.0.0"}
+    return {"status": "ok", "version": "1.1.0"}
 
 
 if __name__ == "__main__":
