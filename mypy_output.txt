@@ -1,0 +1,4 @@
+app\kafka\producer.py:5: error: Skipping analyzing "aiokafka": module is installed, but missing library stubs or py.typed marker  [import-untyped]
+app\kafka\consumer.py:8: error: Skipping analyzing "aiokafka": module is installed, but missing library stubs or py.typed marker  [import-untyped]
+app\kafka\consumer.py:8: note: See https://mypy.readthedocs.io/en/stable/running_mypy.html#missing-imports
+Found 2 errors in 2 files (checked 23 source files)

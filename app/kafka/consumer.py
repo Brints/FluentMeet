@@ -5,7 +5,7 @@ import json
 import logging
 from typing import Any
 
-from aiokafka import AIOKafkaConsumer
+from aiokafka import AIOKafkaConsumer  # type: ignore[import-untyped]
 
 from app.core.config import settings
 from app.kafka.schemas import BaseEvent, DLQEvent

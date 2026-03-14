@@ -2,7 +2,7 @@ import json
 import logging
 from typing import Any
 
-from aiokafka import AIOKafkaProducer
+from aiokafka import AIOKafkaProducer  # type: ignore[import-untyped]
 
 from app.core.config import settings
 from app.kafka.exceptions import KafkaPublishError
