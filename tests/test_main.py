@@ -9,4 +9,7 @@ client = TestClient(app)
 def test_health_check():
     response = client.get("/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "version": settings.VERSION}
+    data = response.json()
+    assert data["status"] in {"ok", "degraded"}  # depends on whether Kafka is running
+    assert data["version"] == settings.VERSION
+    assert "services" in data
