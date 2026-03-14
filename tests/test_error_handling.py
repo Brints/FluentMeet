@@ -1,5 +1,4 @@
-import pytest
-from fastapi import FastAPI, HTTPException
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 from pydantic import BaseModel
 

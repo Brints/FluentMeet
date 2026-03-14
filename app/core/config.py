@@ -1,8 +1,10 @@
 import pathlib
 
-try:
+import sys
+
+if sys.version_info >= (3, 11):
     import tomllib
-except ImportError:
+else:
     import tomli as tomllib
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -11,7 +13,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 def get_version() -> str:
     pyproject_path = pathlib.Path(__file__).parent.parent.parent / "pyproject.toml"
     if pyproject_path.exists():
-        with open(pyproject_path, "rb") as f:
+        with pyproject_path.open("rb") as f:
             data = tomllib.load(f)
             return str(data.get("project", {}).get("version", "1.0.0"))
     return "1.0.0"

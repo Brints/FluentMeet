@@ -2,6 +2,7 @@ import logging
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.core.error_responses import create_error_response
@@ -10,7 +11,7 @@ from app.core.exceptions import FluentMeetException
 logger = logging.getLogger(__name__)
 
 
-async def fluentmeet_exception_handler(request: Request, exc: FluentMeetException):
+async def fluentmeet_exception_handler(_request: Request, exc: Any) -> JSONResponse:
     """
     Handler for all custom FluentMeetException exceptions.
     """
@@ -22,7 +23,7 @@ async def fluentmeet_exception_handler(request: Request, exc: FluentMeetExceptio
     )
 
 
-async def validation_exception_handler(request: Request, exc: RequestValidationError):
+async def validation_exception_handler(_request: Request, exc: Any) -> JSONResponse:
     """
     Handler for Pydantic validation errors (422 -> 400).
     """
@@ -43,7 +44,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     )
 
 
-async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+async def http_exception_handler(_request: Request, exc: Any) -> JSONResponse:
     """
     Handler for Starlette/FastAPI HTTP exceptions.
     """
@@ -54,7 +55,9 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
     )
 
 
-async def unhandled_exception_handler(request: Request, exc: Exception):
+async def unhandled_exception_handler(
+    _request: Request, exc: Exception
+) -> JSONResponse:
     """
     Handler for all other unhandled exceptions (500).
     """
