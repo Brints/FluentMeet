@@ -1,4 +1,3 @@
-import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -54,7 +53,7 @@ async def test_consumer_retries_then_succeeds(consumer):
     """handle() fails twice then succeeds on third attempt."""
     call_count = 0
 
-    async def flaky_handle(event):
+    async def flaky_handle(_event):
         nonlocal call_count
         call_count += 1
         if call_count < 3:
