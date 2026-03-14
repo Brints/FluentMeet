@@ -1,9 +1,21 @@
+import pathlib
+import tomllib
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def get_version() -> str:
+    pyproject_path = pathlib.Path(__file__).parent.parent.parent / "pyproject.toml"
+    if pyproject_path.exists():
+        with pyproject_path.open("rb") as f:
+            data = tomllib.load(f)
+            return str(data.get("project", {}).get("version", "1.0.0"))
+    return "1.0.0"
 
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "FluentMeet"
-    VERSION: str = "1.0.0"
+    VERSION: str = get_version()
     API_V1_STR: str = "/api/v1"
 
     # Security
@@ -31,7 +43,9 @@ class Settings(BaseSettings):
     VOICE_AI_API_KEY: str | None = None
     OPENAI_API_KEY: str | None = None
 
-    model_config = SettingsConfigDict(env_file=".env", case_sensitive=True)
+    model_config = SettingsConfigDict(
+        env_file=".env", case_sensitive=True, extra="ignore"
+    )
 
 
 settings = Settings()

@@ -163,6 +163,23 @@ pytest tests/ -v --cov=app --cov-report=html --cov-report=term
 
 ---
 
+## Linting & Formatting
+- **Black**: Enforce consistent code formatting.
+```bash
+black .
+```
+- **isort**: Sort imports for readability.
+```bash
+isort .
+```
+- **ruff**: Linting for code quality and style.
+```bash
+ruff .
+```
+```bash
+python -m ruff check .
+```
+
 ## 🤝 Contributing
 
 We welcome contributions! Please follow these steps:
