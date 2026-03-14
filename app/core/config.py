@@ -36,12 +36,21 @@ class Settings(BaseSettings):
 
     # Kafka
     KAFKA_BOOTSTRAP_SERVERS: str = "localhost:9092"
+    KAFKA_PRODUCER_ACK: str = "all"
+    KAFKA_CONSUMER_AUTO_OFFSET_RESET: str = "earliest"
+    KAFKA_MAX_RETRIES: int = 3
+    KAFKA_RETRY_BACKOFF_MS: int = 1000
 
     # External Services Keys
     DEEPGRAM_API_KEY: str | None = None
     DEEPL_API_KEY: str | None = None
     VOICE_AI_API_KEY: str | None = None
     OPENAI_API_KEY: str | None = None
+
+    # Mailgun Email Service
+    MAILGUN_API_KEY: str | None = None
+    MAILGUN_DOMAIN: str | None = None
+    MAILGUN_FROM_EMAIL: str | None = None
 
     model_config = SettingsConfigDict(
         env_file=".env", case_sensitive=True, extra="ignore"
