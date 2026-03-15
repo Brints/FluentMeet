@@ -1,13 +1,36 @@
 from datetime import datetime
+from enum import StrEnum
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+
+
+class SupportedLanguage(StrEnum):
+    ENGLISH = "en"
+    FRENCH = "fr"
+    GERMAN = "de"
+    SPANISH = "es"
+    ITALIAN = "it"
+    PORTUGUESE = "pt"
 
 
 class UserBase(BaseModel):
     email: EmailStr
-    full_name: str | None = None
-    speaking_language: str = "en"
-    listening_language: str = "en"
+    full_name: str | None = Field(default=None, max_length=255)
+    speaking_language: SupportedLanguage = SupportedLanguage.ENGLISH
+    listening_language: SupportedLanguage = SupportedLanguage.ENGLISH
+
+    @field_validator("email", mode="before")
+    @classmethod
+    def normalize_email(cls, value: str) -> str:
+        return value.strip().lower()
+
+    @field_validator("full_name", mode="before")
+    @classmethod
+    def strip_full_name(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        stripped_value = value.strip()
+        return stripped_value or None
 
 
 class UserCreate(UserBase):
@@ -15,10 +38,18 @@ class UserCreate(UserBase):
 
 
 class UserUpdate(BaseModel):
-    full_name: str | None = None
-    speaking_language: str | None = None
-    listening_language: str | None = None
+    full_name: str | None = Field(default=None, max_length=255)
+    speaking_language: SupportedLanguage | None = None
+    listening_language: SupportedLanguage | None = None
     password: str | None = Field(None, min_length=8)
+
+    @field_validator("full_name", mode="before")
+    @classmethod
+    def strip_full_name(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        stripped_value = value.strip()
+        return stripped_value or None
 
 
 class UserResponse(UserBase):
@@ -27,8 +58,7 @@ class UserResponse(UserBase):
     is_verified: bool
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class Token(BaseModel):

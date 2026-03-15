@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel, Field
@@ -14,7 +14,7 @@ class BaseEvent(BaseModel, Generic[T]):
 
     event_id: uuid.UUID = Field(default_factory=uuid.uuid4)
     event_type: str
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     payload: T
 
 
@@ -28,7 +28,7 @@ class DLQEvent(BaseModel):
     original_topic: str
     original_event: dict[str, Any]
     error_message: str
-    failed_at: datetime = Field(default_factory=datetime.utcnow)
+    failed_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
     retry_count: int
 
 

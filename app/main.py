@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.v1 import api_router
 from app.core.config import settings
 from app.core.exception_handlers import register_exception_handlers
 from app.kafka.manager import get_kafka_manager
@@ -36,6 +37,7 @@ app.add_middleware(
 )
 
 register_exception_handlers(app)
+app.include_router(api_router, prefix=settings.API_V1_STR)
 
 
 @app.get("/health", tags=["health"])
