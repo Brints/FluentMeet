@@ -1,3 +1,4 @@
+import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
@@ -9,15 +10,24 @@ from app.core.config import settings
 from app.core.exception_handlers import register_exception_handlers
 from app.kafka.manager import get_kafka_manager
 
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
     # Startup
     kafka_manager = get_kafka_manager()
-    await kafka_manager.start()
+    kafka_started = False
+    try:
+        await kafka_manager.start()
+        kafka_started = True
+    except Exception as exc:
+        # Keep API startup alive in environments where Kafka isn't available (e.g. CI).
+        logger.warning("Kafka startup skipped: %s", exc)
     yield
     # Shutdown
-    await kafka_manager.stop()
+    if kafka_started:
+        await kafka_manager.stop()
 
 
 app = FastAPI(
