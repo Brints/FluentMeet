@@ -40,6 +40,7 @@ class Settings(BaseSettings):
     KAFKA_CONSUMER_AUTO_OFFSET_RESET: str = "earliest"
     KAFKA_MAX_RETRIES: int = 3
     KAFKA_RETRY_BACKOFF_MS: int = 1000
+    KAFKA_EMAIL_CONSUMER_GROUP_ID: str = "email-worker"
 
     # External Services Keys
     DEEPGRAM_API_KEY: str | None = None
@@ -50,7 +51,11 @@ class Settings(BaseSettings):
     # Mailgun Email Service
     MAILGUN_API_KEY: str | None = None
     MAILGUN_DOMAIN: str | None = None
-    MAILGUN_FROM_EMAIL: str | None = None
+    MAILGUN_FROM_ADDRESS: str = "no-reply@fluentmeet.com"
+    MAILGUN_TIMEOUT_SECONDS: float = 10.0
+
+    # URL used in transactional email links
+    FRONTEND_BASE_URL: str = "http://localhost:3000"
 
     model_config = SettingsConfigDict(
         env_file=".env", case_sensitive=True, extra="ignore"

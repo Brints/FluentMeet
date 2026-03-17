@@ -33,10 +33,11 @@ class DLQEvent(BaseModel):
 
 
 class EmailPayload(BaseModel):
-    to_email: str
+    to: str
     subject: str
-    template_name: str
-    template_data: dict[str, Any] = {}
+    template: str
+    data: dict[str, Any] = Field(default_factory=dict)
+    html_body: str | None = None
 
 
 class EmailEvent(BaseEvent[EmailPayload]):
@@ -47,7 +48,7 @@ class MediaUploadPayload(BaseModel):
     user_id: int
     file_path: str
     file_type: str  # e.g., 'avatar', 'recording'
-    metadata: dict[str, Any] = {}
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class MediaUploadEvent(BaseEvent[MediaUploadPayload]):
