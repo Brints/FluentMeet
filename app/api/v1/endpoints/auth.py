@@ -67,7 +67,9 @@ async def forgot_password(
     user = get_user_by_email(db, request.email)
 
     if user:
-        reset_link = f"{settings.FRONTEND_BASE_URL}/reset-password?user={user.id}&token={uuid4()}"
+        reset_link = (
+            f"{settings.FRONTEND_BASE_URL}/reset-password?user={user.id}&token={uuid4()}"
+        )
         try:
             await email_producer.send_email(
                 to=user.email,
