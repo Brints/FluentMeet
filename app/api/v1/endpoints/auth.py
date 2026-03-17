@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.crud.user import create_user, get_user_by_email
+from app.crud.user.user import create_user, get_user_by_email
 from app.db.session import get_db
 from app.schemas.auth import (
     ActionAcknowledgement,
