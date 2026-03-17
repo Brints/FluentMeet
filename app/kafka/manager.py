@@ -4,6 +4,7 @@ from typing import Optional
 from app.core.config import settings
 from app.kafka.consumer import BaseConsumer
 from app.kafka.producer import KafkaProducer
+from app.services.email_consumer import EmailConsumerWorker
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +37,7 @@ class KafkaManager:
             bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS
         )
         self.consumers: list[BaseConsumer] = []
+        self.register_consumer(EmailConsumerWorker(producer=self.producer))
         self._initialized = True
 
     def register_consumer(self, consumer: BaseConsumer) -> None:
