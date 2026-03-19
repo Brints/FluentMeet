@@ -13,3 +13,12 @@ class ForgotPasswordRequest(BaseModel):
 
 class ActionAcknowledgement(BaseModel):
     message: str
+
+
+class VerifyEmailResponse(BaseModel):
+    status: str = "ok"
+    message: str
+
+
+class ResendVerificationRequest(BaseModel):
+    email: EmailStr

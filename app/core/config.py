@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "placeholder_secret_key"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    VERIFICATION_TOKEN_EXPIRE_HOURS: int = 24
 
     # Database
     POSTGRES_SERVER: str = "localhost"

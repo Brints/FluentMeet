@@ -8,6 +8,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.core.error_responses import create_error_response
 from app.core.exceptions import FluentMeetException
+from app.core.sanitize import sanitize_for_log
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +63,7 @@ async def unhandled_exception_handler(
     """
     Handler for all other unhandled exceptions (500).
     """
-    logger.exception("Unhandled exception occurred: %s", str(exc))
+    logger.exception("Unhandled exception occurred: %s", sanitize_for_log(exc))
     return create_error_response(
         status_code=500,
         code="INTERNAL_SERVER_ERROR",

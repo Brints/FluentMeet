@@ -1,13 +1,17 @@
 import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from typing import Any, cast
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi.errors import RateLimitExceeded
 
 from app.api.v1 import api_router
 from app.core.config import settings
 from app.core.exception_handlers import register_exception_handlers
+from app.core.rate_limiter import limiter, rate_limit_exception_handler
+from app.core.sanitize import sanitize_for_log
 from app.kafka.manager import get_kafka_manager
 
 logger = logging.getLogger(__name__)
@@ -23,7 +27,7 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
         kafka_started = True
     except Exception as exc:
         # Keep API startup alive in environments where Kafka isn't available (e.g. CI).
-        logger.warning("Kafka startup skipped: %s", exc)
+        logger.warning("Kafka startup skipped: %s", sanitize_for_log(exc))
     yield
     # Shutdown
     if kafka_started:
@@ -47,6 +51,11 @@ app.add_middleware(
 )
 
 register_exception_handlers(app)
+app.state.limiter = limiter
+app.add_exception_handler(
+    RateLimitExceeded,
+    cast(Any, rate_limit_exception_handler),
+)
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
 

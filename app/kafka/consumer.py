@@ -8,6 +8,7 @@ from typing import Any
 from aiokafka import AIOKafkaConsumer  # type: ignore[import-untyped]
 
 from app.core.config import settings
+from app.core.sanitize import sanitize_log_args
 from app.kafka.schemas import BaseEvent, DLQEvent
 from app.kafka.topics import DLQ_PREFIX
 
@@ -71,7 +72,8 @@ class BaseConsumer(abc.ABC):
             value_deserializer=lambda v: json.loads(v.decode("utf-8")),
         )
         await self._consumer.start()
-        logger.info(f"Consumer for '{self.topic}' (group: '{self.group_id}') started")
+        topic_safe, group_safe = sanitize_log_args(self.topic, self.group_id)
+        logger.info("Consumer for '%s' (group: '%s') started", topic_safe, group_safe)
 
         self._task = asyncio.create_task(self._consume_loop())
 
@@ -87,7 +89,8 @@ class BaseConsumer(abc.ABC):
             await self._consumer.stop()
             self._consumer = None
 
-        logger.info(f"Consumer for '{self.topic}' stopped")
+        topic_safe = sanitize_log_args(self.topic)[0]
+        logger.info("Consumer for '%s' stopped", topic_safe)
 
     async def _consume_loop(self) -> None:
         """Main consumption loop."""
@@ -105,14 +108,17 @@ class BaseConsumer(abc.ABC):
                     # Only commit after successful processing
                     await self._consumer.commit()
                 except Exception:
+                    topic_safe = sanitize_log_args(self.topic)[0]
                     logger.exception(
-                        f"Unrecoverable error on message from '{self.topic}'. "
-                        f"Skipping commit — offset will be re-delivered on restart."
+                        "Unrecoverable error on message from '%s'. "
+                        "Skipping commit - offset will be re-delivered on restart.",
+                        topic_safe,
                     )
         except asyncio.CancelledError:
             pass
         except Exception:
-            logger.exception(f"Unexpected error in consumer loop for '{self.topic}'")
+            topic_safe = sanitize_log_args(self.topic)[0]
+            logger.exception("Unexpected error in consumer loop for '%s'", topic_safe)
 
     async def _process_with_retry(self, event: BaseEvent[Any]) -> None:
         """
@@ -129,16 +135,22 @@ class BaseConsumer(abc.ABC):
                 last_error = e
                 if attempt < settings.KAFKA_MAX_RETRIES:
                     wait_secs = (settings.KAFKA_RETRY_BACKOFF_MS / 1000) * (attempt + 1)
+                    event_id_safe, error_safe = sanitize_log_args(event.event_id, e)
                     logger.warning(
-                        f"Retry {attempt + 1}/{settings.KAFKA_MAX_RETRIES} "
-                        f"for event {event.event_id} in {wait_secs:.1f}s. "
-                        f"Reason: {e}"
+                        "Retry %s/%s for event %s in %.1fs. Reason: %s",
+                        attempt + 1,
+                        settings.KAFKA_MAX_RETRIES,
+                        event_id_safe,
+                        wait_secs,
+                        error_safe,
                     )
                     await asyncio.sleep(wait_secs)
 
+        event_id_safe = sanitize_log_args(event.event_id)[0]
         logger.error(
-            f"Event {event.event_id} failed after "
-            f"{settings.KAFKA_MAX_RETRIES} retries. Routing to DLQ."
+            "Event %s failed after %s retries. Routing to DLQ.",
+            event_id_safe,
+            settings.KAFKA_MAX_RETRIES,
         )
         await self._send_to_dlq(
             event, str(last_error), retries=settings.KAFKA_MAX_RETRIES
@@ -168,11 +180,19 @@ class BaseConsumer(abc.ABC):
                 dlq_topic,
                 value=json.dumps(dlq_payload, default=str).encode("utf-8"),
             )
-            logger.info(f"Event {event.event_id} forwarded to DLQ topic '{dlq_topic}'")
+            event_id_safe, dlq_topic_safe = sanitize_log_args(event.event_id, dlq_topic)
+            logger.info(
+                "Event %s forwarded to DLQ topic '%s'",
+                event_id_safe,
+                dlq_topic_safe,
+            )
         except Exception:
+            event_id_safe, dlq_topic_safe = sanitize_log_args(event.event_id, dlq_topic)
             logger.exception(
-                f"CRITICAL: Failed to forward event {event.event_id} "
-                f"to '{dlq_topic}'. Event is permanently lost."
+                "CRITICAL: Failed to forward event %s to '%s'. "
+                "Event is permanently lost.",
+                event_id_safe,
+                dlq_topic_safe,
             )
 
     @abc.abstractmethod
