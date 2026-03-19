@@ -11,6 +11,7 @@ from app.api.v1 import api_router
 from app.core.config import settings
 from app.core.exception_handlers import register_exception_handlers
 from app.core.rate_limiter import limiter, rate_limit_exception_handler
+from app.core.sanitize import sanitize_for_log
 from app.kafka.manager import get_kafka_manager
 
 logger = logging.getLogger(__name__)
@@ -26,7 +27,7 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
         kafka_started = True
     except Exception as exc:
         # Keep API startup alive in environments where Kafka isn't available (e.g. CI).
-        logger.warning("Kafka startup skipped: %s", exc)
+        logger.warning("Kafka startup skipped: %s", sanitize_for_log(exc))
     yield
     # Shutdown
     if kafka_started:

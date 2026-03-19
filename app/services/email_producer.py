@@ -1,6 +1,7 @@
 import logging
 from typing import Any
 
+from app.core.sanitize import sanitize_log_args
 from app.kafka.manager import get_kafka_manager
 from app.kafka.schemas import EmailEvent, EmailPayload
 from app.kafka.topics import NOTIFICATIONS_EMAIL
@@ -33,7 +34,8 @@ class EmailProducerService:
 
         kafka_manager = get_kafka_manager()
         await kafka_manager.producer.send(self._topic, event, key=to)
-        logger.info("Queued email '%s' for %s", template, to)
+        template_safe, to_safe = sanitize_log_args(template, to)
+        logger.info("Queued email '%s' for %s", template_safe, to_safe)
 
 
 _email_producer_service = EmailProducerService()

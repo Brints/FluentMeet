@@ -6,6 +6,7 @@ import httpx
 from jinja2 import Environment, FileSystemLoader, TemplateNotFound
 
 from app.core.config import settings
+from app.core.sanitize import sanitize_log_args
 from app.kafka.consumer import BaseConsumer
 from app.kafka.schemas import BaseEvent, EmailEvent
 from app.kafka.topics import NOTIFICATIONS_EMAIL
@@ -29,9 +30,10 @@ class EmailTemplateRenderer:
         try:
             template = self._environment.get_template(f"{template_name}.html")
         except TemplateNotFound:
+            template_name_safe = sanitize_log_args(template_name)[0]
             logger.warning(
                 "Template '%s' is missing, falling back to raw html",
-                template_name,
+                template_name_safe,
             )
             return ""
         return template.render(**data)
@@ -70,10 +72,13 @@ class MailgunEmailSender:
                 f"Mailgun transient error ({response.status_code}): {response.text}"
             )
         if response.status_code >= 400:
+            status_safe, response_text_safe = sanitize_log_args(
+                response.status_code, response.text
+            )
             logger.error(
                 "Mailgun rejected email with status %s: %s",
-                response.status_code,
-                response.text,
+                status_safe,
+                response_text_safe,
             )
             return
 
@@ -98,9 +103,8 @@ class EmailConsumerWorker(BaseConsumer):
             )
 
         if not html_body:
-            logger.error(
-                "No html body could be rendered for event %s", email_event.event_id
-            )
+            event_id_safe = sanitize_log_args(email_event.event_id)[0]
+            logger.error("No html body could be rendered for event %s", event_id_safe)
             return
 
         await self._sender.send(
@@ -108,8 +112,11 @@ class EmailConsumerWorker(BaseConsumer):
             subject=email_event.payload.subject,
             html_body=html_body,
         )
+        event_id_safe, recipient_safe = sanitize_log_args(
+            email_event.event_id, email_event.payload.to
+        )
         logger.info(
             "Dispatched email event %s to %s",
-            email_event.event_id,
-            email_event.payload.to,
+            event_id_safe,
+            recipient_safe,
         )

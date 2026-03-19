@@ -2,6 +2,7 @@ import logging
 from typing import Optional
 
 from app.core.config import settings
+from app.core.sanitize import sanitize_log_args
 from app.kafka.consumer import BaseConsumer
 from app.kafka.producer import KafkaProducer
 from app.services.email_consumer import EmailConsumerWorker
@@ -48,7 +49,8 @@ class KafkaManager:
         """
         consumer._producer = self.producer
         self.consumers.append(consumer)
-        logger.info(f"Registered consumer for topic: '{consumer.topic}'")
+        topic_safe = sanitize_log_args(consumer.topic)[0]
+        logger.info("Registered consumer for topic: '%s'", topic_safe)
 
     async def start(self) -> None:
         """Start the producer, then all registered consumers."""
@@ -60,7 +62,7 @@ class KafkaManager:
             await consumer.start(bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS)
 
         logger.info(
-            f"Kafka Manager started — {len(self.consumers)} consumer(s) running"
+            "Kafka Manager started - %s consumer(s) running", len(self.consumers)
         )
 
     async def stop(self) -> None:
@@ -85,8 +87,9 @@ class KafkaManager:
             await self.producer.ping()
             return {"status": "healthy"}
         except Exception as e:
-            logger.error(f"Kafka health check failed: {e}")
-            return {"status": "unhealthy", "error": str(e)}
+            error_safe = sanitize_log_args(e)[0]
+            logger.error("Kafka health check failed: %s", error_safe)
+            return {"status": "unhealthy", "error": error_safe}
 
 
 def get_kafka_manager() -> KafkaManager:

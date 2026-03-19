@@ -180,6 +180,18 @@ ruff .
 python -m ruff check .
 ```
 
+---
+
+## Logging Safety
+
+To prevent log injection and control-character pollution from user-provided inputs,
+FluentMeet sanitizes dynamic log arguments with `app/core/sanitize.py`.
+
+- Use `sanitize_for_log(value)` for a single value.
+- Use `sanitize_log_args(*values)` when logging multiple placeholders.
+- Newline, carriage return, tab, and other control characters are escaped or replaced.
+- Long values are truncated with `...<truncated>`.
+
 ## 🤝 Contributing
 
 We welcome contributions! Please follow these steps:

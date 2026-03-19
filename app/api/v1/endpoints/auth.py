@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.rate_limiter import limiter
+from app.core.sanitize import sanitize_log_args
 from app.crud.user.user import create_user, get_user_by_email
 from app.db.session import get_db
 from app.schemas.auth import (
@@ -62,8 +63,11 @@ async def signup(
         )
     except Exception as exc:
         # Signup should succeed even if email queueing fails.
+        user_id_safe, exc_safe = sanitize_log_args(user.id, exc)
         logger.warning(
-            "Failed to enqueue verification email for user %s: %s", user.id, exc
+            "Failed to enqueue verification email for user %s: %s",
+            user_id_safe,
+            exc_safe,
         )
 
     return SignupResponse.model_validate(user)
@@ -96,8 +100,11 @@ async def forgot_password(
                 template="password_reset",
             )
         except Exception as exc:
+            email_safe, exc_safe = sanitize_log_args(user.email, exc)
             logger.warning(
-                "Failed to enqueue password reset email for %s: %s", user.email, exc
+                "Failed to enqueue password reset email for %s: %s",
+                email_safe,
+                exc_safe,
             )
 
     return ActionAcknowledgement(
@@ -197,8 +204,11 @@ async def resend_verification(
             email_producer=email_producer,
         )
     except Exception as exc:
+        email_safe, exc_safe = sanitize_log_args(payload.email, exc)
         logger.warning(
-            "Failed to enqueue verification resend for %s: %s", payload.email, exc
+            "Failed to enqueue verification resend for %s: %s",
+            email_safe,
+            exc_safe,
         )
 
     return ActionAcknowledgement(

@@ -5,6 +5,7 @@ from typing import Any
 from aiokafka import AIOKafkaProducer  # type: ignore[import-untyped]
 
 from app.core.config import settings
+from app.core.sanitize import sanitize_log_args
 from app.kafka.exceptions import KafkaPublishError
 from app.kafka.schemas import BaseEvent
 
@@ -68,9 +69,11 @@ class KafkaProducer:
             await self._producer.send_and_wait(
                 topic, value=message_dict, key=key.encode("utf-8") if key else None
             )
-            logger.debug(f"Event {event.event_id} sent to topic {topic}")
+            event_id_safe, topic_safe = sanitize_log_args(event.event_id, topic)
+            logger.debug("Event %s sent to topic %s", event_id_safe, topic_safe)
         except KafkaPublishError:
             raise
         except Exception as e:
-            logger.exception(f"Failed to publish event to {topic}")
+            topic_safe = sanitize_log_args(topic)[0]
+            logger.exception("Failed to publish event to %s", topic_safe)
             raise KafkaPublishError(f"Error publishing to {topic}: {e!s}") from e
