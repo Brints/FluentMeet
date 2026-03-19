@@ -213,7 +213,6 @@ async def resend_verification(
 
     return ActionAcknowledgement(
         message=(
-            "If an account with that email exists, we have sent a verification "
-            "email."
+            "If an account with that email exists, we have sent a verification email."
         )
     )
