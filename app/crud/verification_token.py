@@ -8,7 +8,15 @@ from app.models.verification_token import VerificationToken
 
 
 class VerificationTokenRepository:
+    """Repository class for managing verification tokens in the database."""
+
     def get_token(self, db: Session, token: str) -> VerificationToken | None:
+        """
+        Args:
+        :param db:
+        :param token:
+        :return:
+        """
         statement = select(VerificationToken).where(VerificationToken.token == token)
         return db.execute(statement).scalar_one_or_none()
 
