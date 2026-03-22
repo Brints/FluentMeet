@@ -12,6 +12,16 @@ def default_expiry() -> datetime:
 
 
 class VerificationToken(Base):
+    """Model representing a verification token for email verification or password reset.
+
+    Attributes:
+        id (int): Primary key identifier for the token.
+        user_id (int): Foreign key referencing the associated user.
+        token (str): Unique token string used for verification.
+        expires_at (datetime): Timestamp indicating when the token expires.
+        created_at (datetime): Timestamp indicating when the token was created.
+    """
+
     __tablename__ = "verification_tokens"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
