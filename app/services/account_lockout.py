@@ -15,6 +15,7 @@ import logging
 import redis.asyncio as aioredis
 
 from app.core.config import settings
+from app.core.sanitize import sanitize_log_args
 
 logger = logging.getLogger(__name__)
 
@@ -83,7 +84,7 @@ class AccountLockoutService:
             await self._redis.delete(attempts_key)
             logger.warning(
                 "Account locked for %s after %d failed attempts",
-                email,
+                sanitize_log_args(email),
                 count,
             )
 
