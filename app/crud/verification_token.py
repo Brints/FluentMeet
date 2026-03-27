@@ -11,11 +11,13 @@ class VerificationTokenRepository:
     """Repository class for managing verification tokens in the database."""
 
     def get_token(self, db: Session, token: str) -> VerificationToken | None:
-        """
+        """Retrieves a verification token by its token string.
         Args:
-        :param db:
-        :param token:
-        :return:
+            db: Database session for executing the query.
+            token: Verification token string.
+
+        Returns:
+            The corresponding VerificationToken object if found, otherwise None.
         """
         statement = select(VerificationToken).where(VerificationToken.token == token)
         return db.execute(statement).scalar_one_or_none()
