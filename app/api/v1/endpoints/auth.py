@@ -2,26 +2,36 @@ import logging
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.exceptions import ForbiddenException, UnauthorizedException
 from app.core.rate_limiter import limiter
 from app.core.sanitize import sanitize_log_args
+from app.core.security import SecurityService, get_security_service
 from app.crud.user.user import create_user, get_user_by_email
 from app.db.session import get_db
 from app.schemas.auth import (
     ActionAcknowledgement,
     ForgotPasswordRequest,
+    LoginRequest,
+    LoginResponse,
     ResendVerificationRequest,
     SignupResponse,
     VerifyEmailResponse,
 )
 from app.schemas.user import UserCreate
+from app.services.account_lockout import (
+    AccountLockoutService,
+    get_account_lockout_service,
+)
 from app.services.auth_verification import (
     AuthVerificationService,
     get_auth_verification_service,
 )
 from app.services.email_producer import EmailProducerService, get_email_producer_service
+from app.services.token_store import TokenStoreService, get_token_store_service
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +39,9 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 DB_SESSION_DEPENDENCY = Depends(get_db)
 EMAIL_PRODUCER_DEPENDENCY = Depends(get_email_producer_service)
 AUTH_VERIFICATION_SERVICE_DEPENDENCY = Depends(get_auth_verification_service)
+SECURITY_SERVICE_DEPENDENCY = Depends(get_security_service)
+TOKEN_STORE_SERVICE_DEPENDENCY = Depends(get_token_store_service)
+ACCOUNT_LOCKOUT_SERVICE_DEPENDENCY = Depends(get_account_lockout_service)
 
 
 @router.post(
@@ -216,3 +229,160 @@ async def resend_verification(
             "If an account with that email exists, we have sent a verification email."
         )
     )
+
+
+@router.post(
+    "/login",
+    response_model=LoginResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Authenticate a registered user",
+    description=(
+        "Validates email and password, issues a JWT access token (returned "
+        "in the body) and a JWT refresh token (set as an HttpOnly cookie). "
+        "Rate-limited to 10 requests/minute per IP. The account is locked "
+        "after 5 consecutive failed attempts for 5 days."
+    ),
+    responses={
+        401: {
+            "description": "Invalid credentials",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "error",
+                        "code": "INVALID_CREDENTIALS",
+                        "message": "Invalid email or password.",
+                        "details": [],
+                    }
+                }
+            },
+        },
+        403: {
+            "description": "Account not verified, deleted, or locked",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "not_verified": {
+                            "value": {
+                                "status": "error",
+                                "code": "EMAIL_NOT_VERIFIED",
+                                "message": (
+                                    "Please verify your email before logging in."
+                                ),
+                                "details": [],
+                            }
+                        },
+                        "deleted": {
+                            "value": {
+                                "status": "error",
+                                "code": "ACCOUNT_DELETED",
+                                "message": "This account has been deleted.",
+                                "details": [],
+                            }
+                        },
+                        "locked": {
+                            "value": {
+                                "status": "error",
+                                "code": "ACCOUNT_LOCKED",
+                                "message": (
+                                    "Account is temporarily locked due to "
+                                    "too many failed login attempts. "
+                                    "Please try again later."
+                                ),
+                                "details": [],
+                            }
+                        },
+                    }
+                }
+            },
+        },
+    },
+)
+@limiter.limit("10/minute")
+async def login(
+    request: Request,
+    payload: LoginRequest,
+    db: Session = DB_SESSION_DEPENDENCY,
+    security_svc: SecurityService = SECURITY_SERVICE_DEPENDENCY,
+    token_store: TokenStoreService = TOKEN_STORE_SERVICE_DEPENDENCY,
+    lockout_svc: AccountLockoutService = ACCOUNT_LOCKOUT_SERVICE_DEPENDENCY,
+) -> JSONResponse:
+    del request  # consumed by slowapi
+    email = payload.email.lower()
+
+    # Check lockout
+    if await lockout_svc.is_locked(email):
+        raise ForbiddenException(
+            code="ACCOUNT_LOCKED",
+            message=(
+                "Account is temporarily locked due to too many failed "
+                "login attempts. Please try again later."
+            ),
+        )
+
+    # Lookup user
+    user = get_user_by_email(db, email)
+    if user is None:
+        # Record a failed attempt even for non-existent emails so that
+        # timing is indistinguishable from a wrong-password attempt.
+        await lockout_svc.record_failed_attempt(email)
+        raise UnauthorizedException(
+            code="INVALID_CREDENTIALS",
+            message="Invalid email or password.",
+        )
+
+    # Verify password
+    if not security_svc.verify_password(payload.password, user.hashed_password):
+        await lockout_svc.record_failed_attempt(email)
+        raise UnauthorizedException(
+            code="INVALID_CREDENTIALS",
+            message="Invalid email or password.",
+        )
+
+    # Guard: email verified?
+    if not user.is_verified:
+        raise ForbiddenException(
+            code="EMAIL_NOT_VERIFIED",
+            message="Please verify your email before logging in.",
+        )
+
+    # Guard: soft-deleted?
+    if user.deleted_at is not None:
+        raise ForbiddenException(
+            code="ACCOUNT_DELETED",
+            message="This account has been deleted.",
+        )
+
+    # Reset failed-login counter on success
+    await lockout_svc.reset_attempts(email)
+
+    # Issue tokens
+    access_token, expires_in = security_svc.create_access_token(email=email)
+    refresh_token, refresh_jti, refresh_ttl = security_svc.create_refresh_token(
+        email=email,
+    )
+
+    # Persist refresh JTI in Redis
+    await token_store.save_refresh_token(jti=refresh_jti, ttl_seconds=refresh_ttl)
+
+    # Build JSON body
+    body = LoginResponse(
+        access_token=access_token,
+        user_id=user.id,
+        token_type="bearer",
+        expires_in=expires_in,
+    )
+
+    response = JSONResponse(content=body.model_dump(mode="json"), status_code=200)
+
+    # Set HttpOnly refresh-token cookie
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,
+        secure=True,
+        samesite="strict",
+        path=f"{settings.API_V1_STR}/auth",
+        max_age=refresh_ttl,
+    )
+
+    return response

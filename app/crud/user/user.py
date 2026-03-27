@@ -1,24 +1,10 @@
-from typing import cast
-
-import bcrypt
-from passlib.context import CryptContext
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.exceptions import ConflictException
+from app.core.security import security_service
 from app.models.user import User
 from app.schemas.user import UserCreate
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-
-def hash_password(password: str) -> str:
-    try:
-        return cast(str, pwd_context.hash(password))
-    except ValueError:
-        # Passlib's bcrypt backend probing can fail with newer bcrypt builds.
-        salt = bcrypt.gensalt()
-        return bcrypt.hashpw(password.encode("utf-8"), salt).decode("utf-8")
 
 
 def get_user_by_email(db: Session, email: str) -> User | None:
@@ -36,7 +22,7 @@ def create_user(db: Session, user_in: UserCreate) -> User:
 
     db_user = User(
         email=user_in.email.lower(),
-        hashed_password=hash_password(user_in.password),
+        hashed_password=security_service.hash_password(user_in.password),
         full_name=user_in.full_name,
         speaking_language=user_in.speaking_language.value,
         listening_language=user_in.listening_language.value,

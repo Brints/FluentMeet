@@ -1,3 +1,4 @@
+import uuid
 from datetime import UTC, datetime
 from types import SimpleNamespace
 
@@ -5,8 +6,9 @@ from app.schemas.user import SupportedLanguage, UserResponse
 
 
 def test_user_response_can_validate_from_attributes() -> None:
+    mock_id = uuid.uuid4()
     source = SimpleNamespace(
-        id=123,
+        id=mock_id,
         email="person@example.com",
         full_name="Test Person",
         speaking_language="en",
@@ -18,7 +20,7 @@ def test_user_response_can_validate_from_attributes() -> None:
 
     result = UserResponse.model_validate(source)
 
-    assert result.id == 123
+    assert result.id == mock_id
     assert result.email == "person@example.com"
     assert result.speaking_language == SupportedLanguage.ENGLISH
     assert result.listening_language == SupportedLanguage.FRENCH
