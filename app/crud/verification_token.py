@@ -1,3 +1,4 @@
+import uuid
 from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
@@ -22,7 +23,7 @@ class VerificationTokenRepository:
         statement = select(VerificationToken).where(VerificationToken.token == token)
         return db.execute(statement).scalar_one_or_none()
 
-    def create_token(self, db: Session, user_id: int) -> VerificationToken:
+    def create_token(self, db: Session, user_id: uuid.UUID) -> VerificationToken:
         expires_at = datetime.now(UTC) + timedelta(
             hours=settings.VERIFICATION_TOKEN_EXPIRE_HOURS
         )
@@ -39,7 +40,7 @@ class VerificationTokenRepository:
         db.delete(token)
         db.commit()
 
-    def delete_unexpired_tokens_for_user(self, db: Session, user_id: int) -> None:
+    def delete_unexpired_tokens_for_user(self, db: Session, user_id: uuid.UUID) -> None:
         now = datetime.now(UTC)
         statement = select(VerificationToken).where(
             VerificationToken.user_id == user_id,
@@ -59,7 +60,7 @@ def get_token(db: Session, token: str) -> VerificationToken | None:
     return verification_token_repository.get_token(db=db, token=token)
 
 
-def create_token(db: Session, user_id: int) -> VerificationToken:
+def create_token(db: Session, user_id: uuid.UUID) -> VerificationToken:
     return verification_token_repository.create_token(db=db, user_id=user_id)
 
 

@@ -2,7 +2,7 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any, Generic, TypeVar
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
 
 T = TypeVar("T")
 
@@ -44,8 +44,13 @@ class EmailEvent(BaseEvent[EmailPayload]):
     event_type: str = "email.dispatch"
 
 
+class UserRegisteredEvent(BaseEvent):
+    user_id: uuid.UUID
+    email: EmailStr
+
+
 class MediaUploadPayload(BaseModel):
-    user_id: int
+    user_id: uuid.UUID
     file_path: str
     file_type: str  # e.g., 'avatar', 'recording'
     metadata: dict[str, Any] = Field(default_factory=dict)

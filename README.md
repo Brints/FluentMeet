@@ -130,6 +130,10 @@ Ensure your models are imported in `app/models/init.py` for Alembic to detect th
 ```bash
 python -m alembic revision --autogenerate -m "Add Meeting model"
 ```
+### **Migrate Head**
+```bash
+alembic upgrade head
+```
 
 ### **Applying Migrations**
 ```bash

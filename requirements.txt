@@ -63,6 +63,7 @@ openai==2.26.0
 packaging==26.0
 passlib==1.7.4
 pathspec==1.0.4
+psycopg2-binary==2.9.11
 platformdirs==4.9.4
 pluggy==1.6.0
 propcache==0.4.1

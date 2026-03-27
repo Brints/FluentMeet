@@ -1,3 +1,4 @@
+import uuid
 from datetime import UTC, datetime
 from typing import Final
 from uuid import UUID
@@ -29,7 +30,9 @@ class AuthVerificationService:
     ) -> None:
         self._token_repository: Final[VerificationTokenRepository] = token_repository
 
-    def create_verification_token(self, db: Session, user_id: int) -> VerificationToken:
+    def create_verification_token(
+        self, db: Session, user_id: uuid.UUID
+    ) -> VerificationToken:
         return self._token_repository.create_token(db=db, user_id=user_id)
 
     def verify_email(self, db: Session, token: str | None) -> None:

@@ -16,7 +16,7 @@ class VerificationToken(Base):
 
     Attributes:
         id (int): Primary key identifier for the token.
-        user_id (int): Foreign key referencing the associated user.
+        user_id (uuid.UUID): Foreign key referencing the associated user.
         token (str): Unique token string used for verification.
         expires_at (datetime): Timestamp indicating when the token expires.
         created_at (datetime): Timestamp indicating when the token was created.
@@ -25,7 +25,7 @@ class VerificationToken(Base):
     __tablename__ = "verification_tokens"
 
     id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
     token: Mapped[str] = mapped_column(
         String(36),
         unique=True,
