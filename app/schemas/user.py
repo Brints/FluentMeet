@@ -72,3 +72,10 @@ class Token(BaseModel):
 class TokenData(BaseModel):
     email: str | None = None
     jti: str | None = None
+
+
+class RefreshTokenClaims(BaseModel):
+    """Validated, non-optional claims extracted from a refresh token JWT."""
+
+    email: str
+    jti: str

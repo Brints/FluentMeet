@@ -17,6 +17,7 @@ from app.schemas.auth import (
     ForgotPasswordRequest,
     LoginRequest,
     LoginResponse,
+    RefreshTokenResponse,
     ResendVerificationRequest,
     SignupResponse,
     VerifyEmailResponse,
@@ -361,8 +362,10 @@ async def login(
         email=email,
     )
 
-    # Persist refresh JTI in Redis
-    await token_store.save_refresh_token(jti=refresh_jti, ttl_seconds=refresh_ttl)
+    # Persist refresh JTI in Redis (keyed by email + jti)
+    await token_store.save_refresh_token(
+        email=email, jti=refresh_jti, ttl_seconds=refresh_ttl
+    )
 
     # Build JSON body
     body = LoginResponse(
@@ -385,4 +388,145 @@ async def login(
         max_age=refresh_ttl,
     )
 
+    return response
+
+
+@router.post(
+    "/refresh-token",
+    summary="Rotate refresh token",
+    description=(
+        "Reads the ``refresh_token`` HttpOnly cookie, validates it, revokes the "
+        "old JTI, and issues a new access + refresh token pair. Implements the "
+        "**Refresh Token Rotation** pattern: reuse of a revoked token triggers "
+        "full session invalidation."
+    ),
+    status_code=200,
+    responses={
+        200: {"description": "New access token issued; refresh cookie updated."},
+        401: {
+            "description": "Missing, invalid, expired, or reused refresh token.",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "missing": {
+                            "value": {
+                                "status": "error",
+                                "code": "MISSING_REFRESH_TOKEN",
+                                "message": "No refresh token provided.",
+                                "details": [],
+                            }
+                        },
+                        "invalid": {
+                            "value": {
+                                "status": "error",
+                                "code": "INVALID_REFRESH_TOKEN",
+                                "message": "Refresh token is invalid or has expired.",
+                                "details": [],
+                            }
+                        },
+                        "reuse": {
+                            "value": {
+                                "status": "error",
+                                "code": "REFRESH_TOKEN_REUSE",
+                                "message": (
+                                    "Session has been invalidated. Please log in again."
+                                ),
+                                "details": [],
+                            }
+                        },
+                    }
+                }
+            },
+        },
+        403: {
+            "description": "Account has been deactivated or deleted.",
+            "content": {
+                "application/json": {
+                    "examples": {
+                        "deactivated": {
+                            "value": {
+                                "status": "error",
+                                "code": "ACCOUNT_DEACTIVATED",
+                                "message": "This account has been deactivated.",
+                                "details": [],
+                            }
+                        }
+                    }
+                }
+            },
+        },
+    },
+)
+@limiter.limit("30/minute")
+async def refresh_token(
+    request: Request,
+    db: Session = DB_SESSION_DEPENDENCY,
+    security_svc: SecurityService = SECURITY_SERVICE_DEPENDENCY,
+    token_store: TokenStoreService = TOKEN_STORE_SERVICE_DEPENDENCY,
+) -> JSONResponse:
+    # --- 1. Read the cookie --------------------------------------------------
+    raw_token = request.cookies.get("refresh_token")
+    if not raw_token:
+        raise UnauthorizedException(
+            code="MISSING_REFRESH_TOKEN",
+            message="No refresh token provided.",
+        )
+
+    # --- 2. Decode & validate signature / expiry / type ----------------------
+    try:
+        token_data = security_svc.decode_refresh_token(raw_token)
+    except ValueError as exc:
+        raise UnauthorizedException(
+            code="INVALID_REFRESH_TOKEN",
+            message="Refresh token is invalid or has expired.",
+        ) from exc
+
+    # RefreshTokenClaims guarantees email and jti are non-None str.
+    email = token_data.email
+    old_jti = token_data.jti
+
+    # --- 3. Check Redis — detect reuse of a revoked token --------------------
+    if not await token_store.is_refresh_token_valid(email=email, jti=old_jti):
+        # Potential theft: tear down ALL sessions for this user.
+        await token_store.revoke_all_user_tokens(email=email)
+        logger.warning(
+            "Refresh token reuse detected for %s — all sessions revoked.",
+            sanitize_log_args(email)[0],
+        )
+        raise UnauthorizedException(
+            code="REFRESH_TOKEN_REUSE",
+            message="Session has been invalidated. Please log in again.",
+        )
+
+    # --- 4. Re-check account status ------------------------------------------
+    user = get_user_by_email(db, email)
+    if user is None or user.deleted_at is not None or not user.is_active:
+        raise ForbiddenException(
+            code="ACCOUNT_DEACTIVATED",
+            message="This account has been deactivated.",
+        )
+
+    # --- 5. Rotation: revoke old JTI, issue new pair -------------------------
+    await token_store.revoke_refresh_token(email=email, jti=old_jti)
+
+    new_access_token, expires_in = security_svc.create_access_token(email=email)
+    new_refresh_token, new_jti, new_ttl = security_svc.create_refresh_token(email=email)
+    await token_store.save_refresh_token(email=email, jti=new_jti, ttl_seconds=new_ttl)
+
+    # --- 6. Build response ---------------------------------------------------
+    body = RefreshTokenResponse(
+        access_token=new_access_token,
+        token_type="bearer",
+        expires_in=expires_in,
+    )
+    response = JSONResponse(content=body.model_dump(mode="json"), status_code=200)
+    response.set_cookie(
+        key="refresh_token",
+        value=new_refresh_token,
+        httponly=True,
+        secure=True,
+        samesite="strict",
+        path=f"{settings.API_V1_STR}/auth",
+        max_age=new_ttl,
+    )
     return response

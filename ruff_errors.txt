@@ -1,0 +1,61 @@
+F821 Undefined name `request`
+   --> app\api\v1\endpoints\auth.py:471:17
+    |
+470 |     # --- 1. Read the cookie --------------------------------------------------
+471 |     raw_token = request.cookies.get("refresh_token")
+    |                 ^^^^^^^
+472 |     if not raw_token:
+473 |         raise UnauthorizedException(
+    |
+
+B904 Within an `except` clause, raise exceptions with `raise ... from err` or `raise ... from None` to distinguish them from errors in exception handling
+   --> app\api\v1\endpoints\auth.py:482:9
+    |
+480 |           token_data = security_svc.decode_refresh_token(raw_token)
+481 |       except ValueError:
+482 | /         raise UnauthorizedException(
+483 | |             code="INVALID_REFRESH_TOKEN",
+484 | |             message="Refresh token is invalid or has expired.",
+485 | |         )
+    | |_________^
+486 |
+487 |       email = token_data.email
+    |
+
+ARG002 Unused method argument: `fake_redis`
+   --> tests\test_auth\test_auth_refresh.py:227:9
+    |
+225 |         db_session: Session,
+226 |         token_store: TokenStoreService,
+227 |         fake_redis: FakeRedis,
+    |         ^^^^^^^^^^
+228 |     ) -> None:
+229 |         email = "refresh@example.com"
+    |
+
+RUF059 Unpacked variable `jti` is never used
+   --> tests\test_auth\test_auth_refresh.py:350:20
+    |
+348 |         email = "refresh@example.com"
+349 |         _seed_user(db_session, email=email)
+350 |         raw_token, jti, ttl = _make_refresh_cookie(email)
+    |                    ^^^
+351 |
+352 |         import asyncio
+    |
+help: Prefix it with an underscore or any other dummy variable pattern
+
+RUF059 Unpacked variable `ttl` is never used
+   --> tests\test_auth\test_auth_refresh.py:350:25
+    |
+348 |         email = "refresh@example.com"
+349 |         _seed_user(db_session, email=email)
+350 |         raw_token, jti, ttl = _make_refresh_cookie(email)
+    |                         ^^^
+351 |
+352 |         import asyncio
+    |
+help: Prefix it with an underscore or any other dummy variable pattern
+
+Found 5 errors.
+No fixes available (2 hidden fixes can be enabled with the `--unsafe-fixes` option).

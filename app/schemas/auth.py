@@ -44,3 +44,15 @@ class LoginResponse(BaseModel):
     user_id: uuid.UUID
     token_type: str = "bearer"
     expires_in: int
+
+
+class RefreshTokenResponse(BaseModel):
+    """Payload returned on successful token rotation.
+
+    The new refresh token is delivered exclusively via an HttpOnly
+    cookie - it is intentionally *not* included in the response body.
+    """
+
+    access_token: str
+    token_type: str = "bearer"
+    expires_in: int

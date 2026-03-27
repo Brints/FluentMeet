@@ -47,8 +47,9 @@ class FakeRedis:
     async def get(self, key: str) -> str | None:
         return self._store.get(key)
 
-    async def delete(self, key: str) -> None:
-        self._store.pop(key, None)
+    async def delete(self, *keys: str) -> None:
+        for key in keys:
+            self._store.pop(key, None)
 
     async def exists(self, key: str) -> int:
         return 1 if key in self._store else 0
@@ -59,8 +60,42 @@ class FakeRedis:
         self._store[key] = str(current)
         return current
 
+    async def scan(
+        self,
+        cursor: int,  # noqa: ARG002
+        match: str | None = None,
+        count: int | None = None,  # noqa: ARG002
+    ) -> tuple[int, list[str]]:
+        import fnmatch
+
+        matched = (
+            [k for k in self._store if fnmatch.fnmatch(k, match)]
+            if match
+            else list(self._store.keys())
+        )
+        return 0, matched
+
+    def pipeline(self) -> "FakePipeline":
+        return FakePipeline(self)
+
     def reset(self) -> None:
         self._store.clear()
+
+
+class FakePipeline:
+    """Minimal pipeline stand-in."""
+
+    def __init__(self, redis: FakeRedis) -> None:
+        self._redis = redis
+        self._cmds: list[str] = []
+
+    def delete(self, key: str) -> "FakePipeline":
+        self._cmds.append(key)
+        return self
+
+    async def execute(self) -> None:
+        for key in self._cmds:
+            self._redis._store.pop(key, None)
 
 
 # ---------------------------------------------------------------------------
