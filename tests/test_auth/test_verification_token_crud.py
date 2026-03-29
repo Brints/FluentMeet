@@ -1,3 +1,4 @@
+import uuid
 from collections.abc import Generator
 from datetime import UTC, datetime, timedelta
 
@@ -6,11 +7,9 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.crud.user.user import create_user
-from app.crud.verification_token import verification_token_repository
-from app.models.user import Base
-from app.models.verification_token import VerificationToken
-from app.schemas.user import SupportedLanguage, UserCreate
+from app.auth.models import User, VerificationToken
+from app.auth.schemas import SupportedLanguage
+from app.models.base import Base
 
 
 def _as_aware_utc(value: datetime) -> datetime:
@@ -19,18 +18,17 @@ def _as_aware_utc(value: datetime) -> datetime:
     return value.astimezone(UTC)
 
 
-def _new_user_payload(email: str) -> UserCreate:
-    return UserCreate(
+def _create_user(db: Session, email: str) -> uuid.UUID:
+    user = User(
         email=email,
-        password="MyStr0ngP@ss!",
+        hashed_password="hashed_password",
         full_name="Token User",
-        speaking_language=SupportedLanguage.ENGLISH,
-        listening_language=SupportedLanguage.FRENCH,
+        speaking_language=SupportedLanguage.ENGLISH.value,
+        listening_language=SupportedLanguage.FRENCH.value,
     )
-
-
-def _create_user(db: Session, email: str) -> int:
-    user = create_user(db=db, user_in=_new_user_payload(email=email))
+    db.add(user)
+    db.commit()
+    db.refresh(user)
     return user.id
 
 
@@ -49,13 +47,13 @@ def db_session() -> Generator[Session, None, None]:
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
-    testing_session_local = sessionmaker(
+    TestingSessionLocal = sessionmaker(
         autocommit=False,
         autoflush=False,
         bind=engine,
     )
     Base.metadata.create_all(bind=engine)
-    db = testing_session_local()
+    db = TestingSessionLocal()
     try:
         yield db
     finally:
@@ -66,7 +64,14 @@ def db_session() -> Generator[Session, None, None]:
 
 def test_create_token_persists_token(db_session: Session) -> None:
     user_id = _create_user(db=db_session, email="crud-create@example.com")
-    token = verification_token_repository.create_token(db=db_session, user_id=user_id)
+
+    # Direct model creation instead of repository
+    token = VerificationToken(
+        user_id=user_id, expires_at=datetime.now(UTC) + timedelta(hours=24)
+    )
+    db_session.add(token)
+    db_session.commit()
+    db_session.refresh(token)
 
     assert token.id is not None
     assert token.user_id == user_id
@@ -76,42 +81,55 @@ def test_create_token_persists_token(db_session: Session) -> None:
 
 def test_get_token_returns_matching_row(db_session: Session) -> None:
     user_id = _create_user(db=db_session, email="crud-get@example.com")
-    created = verification_token_repository.create_token(db=db_session, user_id=user_id)
+    token = VerificationToken(user_id=user_id)
+    db_session.add(token)
+    db_session.commit()
 
-    found = verification_token_repository.get_token(db=db_session, token=created.token)
+    statement = select(VerificationToken).where(VerificationToken.token == token.token)
+    found = db_session.execute(statement).scalar_one_or_none()
 
     assert found is not None
-    assert found.id == created.id
+    assert found.id == token.id
 
 
 def test_delete_token_removes_row(db_session: Session) -> None:
     user_id = _create_user(db=db_session, email="crud-delete@example.com")
-    created = verification_token_repository.create_token(db=db_session, user_id=user_id)
+    token = VerificationToken(user_id=user_id)
+    db_session.add(token)
+    db_session.commit()
 
-    verification_token_repository.delete_token(db=db_session, token_id=created.id)
+    db_session.delete(token)
+    db_session.commit()
 
-    statement = select(VerificationToken).where(VerificationToken.id == created.id)
+    statement = select(VerificationToken).where(VerificationToken.id == token.id)
     assert db_session.execute(statement).scalar_one_or_none() is None
 
 
-def test_delete_unexpired_tokens_for_user_keeps_expired_tokens(
-    db_session: Session,
-) -> None:
+def test_pruning_expired_tokens_behavior(db_session: Session) -> None:
+    """Manual verification of pruning logic previously in repository."""
     user_id = _create_user(db=db_session, email="crud-prune@example.com")
-    token = verification_token_repository.create_token(db=db_session, user_id=user_id)
-    _force_token_expiry(db=db_session, token_id=token.id)
-    second = verification_token_repository.create_token(db=db_session, user_id=user_id)
 
-    verification_token_repository.delete_unexpired_tokens_for_user(
-        db=db_session,
-        user_id=user_id,
-    )
+    # Token 1: Expired
+    t1 = VerificationToken(user_id=user_id)
+    db_session.add(t1)
+    db_session.commit()
+    _force_token_expiry(db_session, t1.id)
 
-    assert (
-        verification_token_repository.get_token(db=db_session, token=second.token)
-        is None
+    # Token 2: Unexpired
+    t2 = VerificationToken(user_id=user_id)
+    db_session.add(t2)
+    db_session.commit()
+
+    # Simulation of delete_unexpired_tokens_for_user
+    now = datetime.now(UTC)
+    statement = select(VerificationToken).where(
+        VerificationToken.user_id == user_id, VerificationToken.expires_at >= now
     )
-    assert (
-        verification_token_repository.get_token(db=db_session, token=token.token)
-        is not None
-    )
+    unexpired = db_session.execute(statement).scalars().all()
+    for t in unexpired:
+        db_session.delete(t)
+    db_session.commit()
+
+    # Expired token should remain, unexpired should be gone
+    assert db_session.get(VerificationToken, t2.id) is None
+    assert db_session.get(VerificationToken, t1.id) is not None

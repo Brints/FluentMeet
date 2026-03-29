@@ -34,10 +34,6 @@ class UserBase(BaseModel):
         return stripped_value or None
 
 
-class UserCreate(UserBase):
-    password: str = Field(..., min_length=8)
-
-
 class UserUpdate(BaseModel):
     full_name: str | None = Field(default=None, max_length=255)
     speaking_language: SupportedLanguage | None = None
@@ -79,3 +75,60 @@ class RefreshTokenClaims(BaseModel):
 
     email: str
     jti: str
+
+
+class SignupRequest(UserBase):
+    password: str = Field(..., min_length=8)
+
+
+class SignupResponse(UserResponse):
+    """Public payload returned by the signup endpoint."""
+
+
+class LoginRequest(BaseModel):
+    """Credentials submitted to ``POST /auth/login``."""
+
+    email: EmailStr
+    password: str
+
+
+class LoginResponse(BaseModel):
+    """Payload returned on successful login.
+
+    The refresh token is delivered exclusively via an HttpOnly cookie -
+    it is intentionally *not* included in the response body.
+    """
+
+    access_token: str
+    user_id: uuid.UUID
+    token_type: str = "bearer"
+    expires_in: int
+
+
+class VerifyEmailResponse(BaseModel):
+    status: str = "ok"
+    message: str
+
+
+class ResendVerificationRequest(BaseModel):
+    email: EmailStr
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ActionAcknowledgement(BaseModel):
+    message: str
+
+
+class RefreshTokenResponse(BaseModel):
+    """Payload returned on successful token rotation.
+
+    The new refresh token is delivered exclusively via an HttpOnly
+    cookie - it is intentionally *not* included in the response body.
+    """
+
+    access_token: str
+    token_type: str = "bearer"
+    expires_in: int

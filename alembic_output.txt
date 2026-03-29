@@ -1,3 +1,0 @@
-INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
-INFO  [alembic.runtime.migration] Will assume transactional DDL.
-INFO  [alembic.runtime.migration] Running upgrade 19dc9714d9ea -> e1a664780dc6, Add Meeting model

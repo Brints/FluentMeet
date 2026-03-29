@@ -182,6 +182,7 @@ ruff .
 ```
 ```bash
 python -m ruff check .
+ruff format .
 ```
 
 ---

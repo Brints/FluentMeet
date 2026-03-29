@@ -64,7 +64,7 @@ class MailgunEmailSender:
             response = await client.post(
                 endpoint,
                 data=payload,
-                auth=("api", settings.MAILGUN_API_KEY),
+                auth=("routers", settings.MAILGUN_API_KEY),
             )
 
         if response.status_code in {408, 425, 429} or response.status_code >= 500:

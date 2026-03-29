@@ -34,7 +34,7 @@ performance:
   - '(perf|optimization|speed|throughput|latency)'
 
 api:
-  - '(api|endpoint|rest|controller)'
+  - '(routers|endpoint|rest|controller)'
 
 payment:
   - '(payment|stripe|subscription|billing|invoice)'
