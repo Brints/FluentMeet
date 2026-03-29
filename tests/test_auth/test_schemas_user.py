@@ -2,7 +2,7 @@ import uuid
 from datetime import UTC, datetime
 from types import SimpleNamespace
 
-from app.schemas.user import SupportedLanguage, UserResponse
+from app.auth.schemas import SupportedLanguage, UserResponse
 
 
 def test_user_response_can_validate_from_attributes() -> None:

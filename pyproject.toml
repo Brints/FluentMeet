@@ -46,7 +46,7 @@ target-version = "py311"
 # Unlike Flake8, Ruff doesn't enable all `E` and `F` codes by default.
 # See: https://docs.astral.sh/ruff/rules/
 select = ["B", "E", "F", "I", "W", "C90", "UP", "ASYNC", "PT", "ARG", "PTH", "SIM", "PLE", "PLW", "RUF"]
-ignore = []
+ignore = ["B008"]
 
 # Allow fix for all enabled rules (when `--fix`) is provided.
 fixable = ["ALL"]

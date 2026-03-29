@@ -5,10 +5,22 @@ from typing import Any, cast
 from uuid import uuid4
 
 import bcrypt
-from jose import jwt
+from jose import JWTError, jwt
 from passlib.context import CryptContext
 
+from app.auth.schemas import RefreshTokenClaims
 from app.core.config import settings
+
+# Workaround for unmaintained passlib 1.7.4.
+# Suppresses the "error reading bcrypt version" warning on bcrypt 4.0+.
+try:
+    _ = bcrypt.__about__  # type: ignore[attr-defined]
+except AttributeError:
+
+    class _BcryptAbout:
+        __version__ = "4.0.0"
+
+    bcrypt.__about__ = _BcryptAbout()  # type: ignore[attr-defined]
 
 
 class SecurityService:
@@ -111,6 +123,36 @@ class SecurityService:
             algorithm=settings.ALGORITHM,
         )
         return token, jti, ttl_seconds
+
+    def decode_refresh_token(self, token: str) -> RefreshTokenClaims:
+        """Decode and validate a refresh token JWT.
+
+        Raises:
+            ValueError: If the token is invalid, expired, or not a
+                refresh token.
+
+        Returns:
+            :class:`~app.auth.schemas.RefreshTokenClaims` with guaranteed
+            non-``None`` ``email`` and ``jti`` fields.
+        """
+        try:
+            payload = jwt.decode(
+                token,
+                settings.SECRET_KEY,
+                algorithms=[settings.ALGORITHM],
+            )
+        except JWTError as exc:
+            raise ValueError("Invalid or expired refresh token.") from exc
+
+        if payload.get("type") != "refresh":
+            raise ValueError("Token is not a refresh token.")
+
+        email: str | None = payload.get("sub")
+        jti: str | None = payload.get("jti")
+        if not email or not jti:
+            raise ValueError("Refresh token is missing required claims.")
+
+        return RefreshTokenClaims(email=email, jti=jti)
 
 
 # Module-level singleton -----------------------------------------------

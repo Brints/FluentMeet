@@ -7,12 +7,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi.errors import RateLimitExceeded
 
-from app.api.v1 import api_router
 from app.core.config import settings
 from app.core.exception_handlers import register_exception_handlers
 from app.core.rate_limiter import limiter, rate_limit_exception_handler
 from app.core.sanitize import sanitize_for_log
 from app.kafka.manager import get_kafka_manager
+from app.routers import api_router
 
 logger = logging.getLogger(__name__)
 
