@@ -16,7 +16,7 @@ def get_version() -> str:
 class Settings(BaseSettings):
     PROJECT_NAME: str = "FluentMeet"
     VERSION: str = get_version()
-    API_V1_STR: str = "/routers/v1"
+    API_V1_STR: str = "/api/v1"
 
     # Security
     SECRET_KEY: str = "placeholder_secret_key"

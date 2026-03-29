@@ -15,6 +15,7 @@ import logging
 import redis.asyncio as aioredis
 
 from app.core.config import settings
+from app.core.sanitize import sanitize_for_log
 
 logger = logging.getLogger(__name__)
 
@@ -95,7 +96,7 @@ class TokenStoreService:
             logger.warning(
                 "Revoked %d token(s) for %s due to refresh-token reuse.",
                 len(keys_to_delete),
-                email,
+                sanitize_for_log(email),
             )
 
 

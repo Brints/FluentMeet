@@ -1,4 +1,4 @@
-"""Integration tests for ``POST /routers/v1/auth/refresh-token``."""
+"""Integration tests for ``POST /api/v1/auth/refresh-token``."""
 
 from collections.abc import Generator
 from datetime import UTC, datetime

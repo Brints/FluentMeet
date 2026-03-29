@@ -132,7 +132,7 @@ class SecurityService:
                 refresh token.
 
         Returns:
-            :class:`~app.schemas.user.RefreshTokenClaims` with guaranteed
+            :class:`~app.auth.schemas.RefreshTokenClaims` with guaranteed
             non-``None`` ``email`` and ``jti`` fields.
         """
         try:
