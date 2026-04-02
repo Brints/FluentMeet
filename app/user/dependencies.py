@@ -1,0 +1,14 @@
+"""FastAPI dependencies for the user feature package."""
+
+from fastapi import Depends
+from sqlalchemy.orm import Session
+
+from app.db.session import get_db
+from app.user.service import UserService
+
+
+def get_user_service(
+    db: Session = Depends(get_db),
+) -> UserService:
+    """Provide a ``UserService`` wired to the current request's DB session."""
+    return UserService(db=db)

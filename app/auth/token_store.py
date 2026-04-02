@@ -99,6 +99,28 @@ class TokenStoreService:
                 sanitize_for_log(email),
             )
 
+    # ------------------------------------------------------------------
+    # Access-token blacklist
+    # ------------------------------------------------------------------
+
+    BLACKLIST_PREFIX = "blacklisted_access_token"
+
+    def _blacklist_key(self, jti: str) -> str:
+        return f"{self.BLACKLIST_PREFIX}:{jti}"
+
+    async def blacklist_access_token(self, jti: str, ttl_seconds: int) -> None:
+        """Blacklist an access-token JTI for its remaining lifetime.
+
+        Called during account deletion / forced logout to prevent the
+        already-issued JWT from being used again.
+        """
+        if ttl_seconds > 0:
+            await self._redis.set(self._blacklist_key(jti), "1", ex=ttl_seconds)
+
+    async def is_access_token_blacklisted(self, jti: str) -> bool:
+        """Return ``True`` if the access-token JTI has been blacklisted."""
+        return bool(await self._redis.exists(self._blacklist_key(jti)))
+
 
 # Module-level singleton -----------------------------------------------
 token_store_service = TokenStoreService()

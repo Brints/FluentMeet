@@ -1,7 +1,5 @@
 # FluentMeet 🎙️🌐
 
-![CI](https://github.com/afiaa/FluentMeet/actions/workflows/ci.yml/badge.svg)
-
 **"Speak your language, they hear theirs."**
 
 FluentMeet is a state-of-the-art, real-time voice translation video conferencing platform. It eliminates language barriers in global professional collaborations by providing instantaneous, natural-sounding voice translation, allowing participants to communicate naturally in their native tongues.
@@ -128,7 +126,7 @@ Ensure your models are imported in `app/models/init.py` for Alembic to detect th
 
 ### **Creating Migrations**
 ```bash
-python -m alembic revision --autogenerate -m "Add Meeting model"
+python -m alembic revision --autogenerate -m "Add avatar url to users"
 ```
 ### **Migrate Head**
 ```bash

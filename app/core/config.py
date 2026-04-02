@@ -60,6 +60,13 @@ class Settings(BaseSettings):
     MAILGUN_FROM_ADDRESS: str = "no-reply@fluentmeet.com"
     MAILGUN_TIMEOUT_SECONDS: float = 10.0
 
+    # Cloudinary
+    CLOUDINARY_CLOUD_NAME: str | None = None
+    CLOUDINARY_API_KEY: str | None = None
+    CLOUDINARY_API_SECRET: str | None = None
+    CLOUDINARY_MAX_IMAGE_SIZE_MB: int = 5
+    CLOUDINARY_MAX_VIDEO_SIZE_MB: int = 100
+
     # URL used in transactional email links
     FRONTEND_BASE_URL: str = "http://localhost:3000"
 
