@@ -34,6 +34,9 @@ class User(Base):
         DateTime(timezone=True), nullable=True
     )
 
+    # Profile
+    avatar_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+
     # Language preferences
     speaking_language: Mapped[str] = mapped_column(String(10), default="en")
     listening_language: Mapped[str] = mapped_column(String(10), default="en")
