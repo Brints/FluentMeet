@@ -13,7 +13,6 @@ from app.auth.models import User, VerificationToken
 from app.models.base import Base
 from app.user.service import UserService
 
-
 # ── Fixtures ──────────────────────────────────────────────────────────
 
 
@@ -176,9 +175,7 @@ def test_hard_delete_removes_user_and_tokens(
     # Token should be gone.
     assert (
         db_session.execute(
-            select(VerificationToken).where(
-                VerificationToken.user_id == sample_user.id
-            )
+            select(VerificationToken).where(VerificationToken.user_id == sample_user.id)
         ).scalar_one_or_none()
         is None
     )

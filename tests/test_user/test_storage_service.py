@@ -4,7 +4,7 @@ All Cloudinary SDK calls are mocked — no real uploads occur.
 """
 
 from io import BytesIO
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 from fastapi import UploadFile
@@ -16,7 +16,6 @@ from app.external_services.cloudinary.exceptions import (
 )
 from app.external_services.cloudinary.schemas import DeleteResult, UploadResult
 from app.external_services.cloudinary.service import StorageService
-
 
 # ── Helpers ───────────────────────────────────────────────────────────
 
@@ -49,9 +48,7 @@ def _make_upload_file(
 
 @pytest.fixture
 def storage_service() -> StorageService:
-    with patch(
-        "app.external_services.cloudinary.service.ensure_configured"
-    ):
+    with patch("app.external_services.cloudinary.service.ensure_configured"):
         return StorageService()
 
 
@@ -96,9 +93,7 @@ class TestValidation:
 
 class TestUploadImage:
     @pytest.mark.asyncio
-    async def test_upload_image_success(
-        self, storage_service: StorageService
-    ) -> None:
+    async def test_upload_image_success(self, storage_service: StorageService) -> None:
         file = _make_upload_file()
 
         fake_response = {
@@ -130,14 +125,14 @@ class TestUploadImage:
     ) -> None:
         file = _make_upload_file()
 
-        with patch(
-            "app.external_services.cloudinary.service.cloudinary_uploader.upload",
-            side_effect=Exception("API error"),
+        with (
+            patch(
+                "app.external_services.cloudinary.service.cloudinary_uploader.upload",
+                side_effect=Exception("API error"),
+            ),
+            pytest.raises(StorageUploadError),
         ):
-            with pytest.raises(StorageUploadError):
-                await storage_service.upload_image(
-                    file, folder="fluentmeet/avatars"
-                )
+            await storage_service.upload_image(file, folder="fluentmeet/avatars")
 
 
 # ======================================================================
@@ -147,9 +142,7 @@ class TestUploadImage:
 
 class TestUploadVideo:
     @pytest.mark.asyncio
-    async def test_upload_video_success(
-        self, storage_service: StorageService
-    ) -> None:
+    async def test_upload_video_success(self, storage_service: StorageService) -> None:
         file = _make_upload_file(content_type="video/mp4", filename="clip.mp4")
 
         fake_response = {
@@ -203,9 +196,11 @@ class TestDeleteAsset:
     async def test_delete_api_error_raises(
         self, storage_service: StorageService
     ) -> None:
-        with patch(
-            "app.external_services.cloudinary.service.cloudinary_uploader.destroy",
-            side_effect=Exception("API error"),
+        with (
+            patch(
+                "app.external_services.cloudinary.service.cloudinary_uploader.destroy",
+                side_effect=Exception("API error"),
+            ),
+            pytest.raises(StorageDeleteError),
         ):
-            with pytest.raises(StorageDeleteError):
-                await storage_service.delete_asset("fluentmeet/avatars/abc")
+            await storage_service.delete_asset("fluentmeet/avatars/abc")

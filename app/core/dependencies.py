@@ -57,8 +57,8 @@ async def get_current_user(
             settings.SECRET_KEY,
             algorithms=[settings.ALGORITHM],
         )
-    except JWTError:
-        raise credentials_exc
+    except JWTError as err:
+        raise credentials_exc from err
 
     email: str | None = payload.get("sub")
     jti: str | None = payload.get("jti")
@@ -75,9 +75,7 @@ async def get_current_user(
         )
 
     # ── 3. Load user from DB ─────────────────────────────────────────
-    user = db.execute(
-        select(User).where(User.email == email)
-    ).scalar_one_or_none()
+    user = db.execute(select(User).where(User.email == email)).scalar_one_or_none()
 
     if user is None:
         raise credentials_exc

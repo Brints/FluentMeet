@@ -193,9 +193,7 @@ async def delete_account(
             )
             jti = payload.get("jti")
             if jti:
-                remaining = int(
-                    payload.get("exp", 0) - __import__("time").time()
-                )
+                remaining = int(payload.get("exp", 0) - __import__("time").time())
                 await token_store.blacklist_access_token(jti, max(remaining, 0))
         except Exception as exc:
             logger.warning(f"Failed to revoke access token: {exc}")

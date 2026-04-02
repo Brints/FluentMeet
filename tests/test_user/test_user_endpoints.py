@@ -7,7 +7,7 @@ by an in-memory SQLite database.
 
 import uuid
 from collections.abc import Generator
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
 from fastapi.testclient import TestClient
@@ -17,9 +17,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.auth.models import User
 from app.auth.token_store import TokenStoreService, get_token_store_service
-from app.core.config import settings
 from app.core.dependencies import get_current_user
-from app.core.security import SecurityService
 from app.db.session import get_db
 from app.external_services.cloudinary.service import (
     StorageService,
@@ -28,7 +26,6 @@ from app.external_services.cloudinary.service import (
 from app.main import app
 from app.models.base import Base
 from app.services.email_producer import get_email_producer_service
-
 
 # ── Fixtures ──────────────────────────────────────────────────────────
 
@@ -304,7 +301,10 @@ class TestDeleteAccount:
         assert response.status_code == 200
         body = response.json()
         assert body["status"] == "ok"
-        assert "deactivated" in body["message"].lower() or "deleted" in body["message"].lower()
+        assert (
+            "deactivated" in body["message"].lower()
+            or "deleted" in body["message"].lower()
+        )
 
         # Verify DB state — user is soft-deleted.
         refreshed = db_session.execute(
@@ -337,15 +337,13 @@ class TestDeleteAccount:
 
         token_store_mock.revoke_all_user_tokens.assert_awaited_once_with(TEST_EMAIL)
 
-    def test_delete_clears_refresh_cookie(
-        self, client: TestClient
-    ) -> None:
+    def test_delete_clears_refresh_cookie(self, client: TestClient) -> None:
         response = client.delete("/api/v1/users/me")
         cookie_header = response.headers.get("set-cookie", "")
         # The response should clear the refresh_token cookie.
         assert "refresh_token" in cookie_header
         # Max-Age=0 or expires in the past signals deletion.
-        assert 'Max-Age=0' in cookie_header or "max-age=0" in cookie_header
+        assert "Max-Age=0" in cookie_header or "max-age=0" in cookie_header
 
     def test_unauthorized(self, unauthenticated_client: TestClient) -> None:
         response = unauthenticated_client.delete("/api/v1/users/me")
