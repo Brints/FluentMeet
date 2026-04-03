@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        line-height: 1.6;
+        color: #333;
+        margin: 0;
+        padding: 0;
+      }
+      .container {
+        max-width: 600px;
+        margin: 20px auto;
+        padding: 20px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        background-color: #f9f9f9;
+      }
+      .button {
+        display: inline-block;
+        padding: 10px 20px;
+        background-color: #0066cc;
+        color: #ffffff;
+        text-decoration: none;
+        border-radius: 5px;
+        font-weight: bold;
+        margin-top: 15px;
+      }
+      .footer {
+        margin-top: 30px;
+        font-size: 12px;
+        color: #777;
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h2>You are invited to a FluentMeet!</h2>
+      <p>Hello,</p>
+      <p>
+        <b>{{ host_name }}</b> has invited you to join a meeting room: <b>'{{ room }}'</b>.
+      </p>
+      <p>
+        🕒 <b>Time:</b> {{ time_str }}
+      </p>
+      <p>
+        <a href="{{ url }}" class="button">Join the Meeting</a>
+      </p>
+      <div class="footer">
+        <p>If you have trouble clicking the button, copy and paste the following link into your browser:</p>
+        <p>{{ url }}</p>
+        <p>FluentMeet - Real-time Language Translation Platform</p>
+      </div>
+    </div>
+  </body>
+</html>
