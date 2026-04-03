@@ -62,9 +62,18 @@ async def signup(
 @limiter.limit("10/minute")
 async def login(
     request: Request,
-    payload: LoginRequest,
+    payload: LoginRequest | None = None,
     auth_service: AuthService = Depends(get_auth_service),
 ) -> JSONResponse:
+
+    if payload is None:
+        from app.core.exceptions import BadRequestException
+
+        raise BadRequestException(
+            code="MISSING_CREDENTIALS",
+            message="Email and password are required.",
+        )
+
     del request  # consumed by slowapi
 
     login_response, refresh_token, refresh_ttl = await auth_service.login(payload)

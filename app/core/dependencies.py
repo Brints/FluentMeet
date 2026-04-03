@@ -8,7 +8,11 @@ circular imports.
 import logging
 
 from fastapi import Depends
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import (
+    HTTPAuthorizationCredentials,
+    HTTPBearer,
+    OAuth2PasswordBearer,
+)
 from jose import JWTError, jwt
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -24,10 +28,12 @@ logger = logging.getLogger(__name__)
 oauth2_scheme = OAuth2PasswordBearer(
     tokenUrl=f"{settings.API_V1_STR}/auth/login",
 )
+bearer_scheme = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
-    token: str = Depends(oauth2_scheme),
+    token: str | None = Depends(oauth2_scheme),
+    bearer: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
     db: Session = Depends(get_db),
     token_store: TokenStoreService = Depends(get_token_store_service),
 ) -> User:
@@ -35,6 +41,7 @@ async def get_current_user(
 
     Guards
     ------
+    - Missing token          →  401
     - Invalid / expired JWT  →  401
     - Blacklisted JTI        →  401
     - User not found          →  401
@@ -45,6 +52,16 @@ async def get_current_user(
     -------
     The :class:`~app.auth.models.User` ORM instance.
     """
+    # Prefer Bearer token if provided (e.g. from 'HTTP Bearer' field in Swagger)
+    # otherwise fall back to OAuth2 token (from 'Authorize' login form).
+    final_token = bearer.credentials if bearer else token
+
+    if not final_token:
+        raise UnauthorizedException(
+            code="MISSING_TOKEN",
+            message="Not authenticated",
+        )
+
     credentials_exc = UnauthorizedException(
         code="INVALID_CREDENTIALS",
         message="Could not validate credentials.",
@@ -53,7 +70,7 @@ async def get_current_user(
     # ── 1. Decode JWT ─────────────────────────────────────────────────
     try:
         payload = jwt.decode(
-            token,
+            final_token,
             settings.SECRET_KEY,
             algorithms=[settings.ALGORITHM],
         )
@@ -94,3 +111,29 @@ async def get_current_user(
         )
 
     return user
+
+
+oauth2_scheme_optional = OAuth2PasswordBearer(
+    tokenUrl=f"{settings.API_V1_STR}/auth/login",
+    auto_error=False,
+)
+
+
+async def get_current_user_optional(
+    token: str | None = Depends(oauth2_scheme_optional),
+    bearer: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+    db: Session = Depends(get_db),
+    token_store: TokenStoreService = Depends(get_token_store_service),
+) -> User | None:
+    """Attempt to decode JWT and return User if present, otherwise return None."""
+    try:
+        user = await get_current_user(
+            token=token, bearer=bearer, db=db, token_store=token_store
+        )
+        return user
+    except UnauthorizedException:
+        # Happens if token is missing or generic Invalid Credentials
+        return None
+    except ForbiddenException:
+        # Happens if account is deleted or deactivated. Could also return None.
+        return None

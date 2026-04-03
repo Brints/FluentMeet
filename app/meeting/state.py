@@ -1,0 +1,155 @@
+"""Redis-backed ephemeral state service for the meeting feature package."""
+
+import json
+import logging
+from collections.abc import Awaitable
+from typing import Any, cast
+
+import redis.asyncio as aioredis
+
+from app.auth.token_store import _get_redis_client
+from app.meeting.constants import (
+    key_room_active_speaker,
+    key_room_lobby,
+    key_room_participants,
+)
+
+logger = logging.getLogger(__name__)
+
+
+class MeetingStateService:
+    """Manages ephemeral live room state (lobby, participants presence, active speaker)
+    in Redis.
+
+    All operations are asynchronous and hit Redis directly.
+    """
+
+    def __init__(self, redis_client: aioredis.Redis | None = None) -> None:
+        self._redis = redis_client or _get_redis_client()
+
+    # ── Participant Presence Hash ────────────────────────────────────────
+
+    async def add_participant(
+        self, room_code: str, user_id: str, language: str, hardware_ready: bool = True
+    ) -> None:
+        """Add or update a user's presence in the active room participants hash."""
+        state = {
+            "status": "connected",
+            "language": language,
+            "hardware_ready": hardware_ready,
+        }
+        await cast(
+            "Awaitable[Any]",
+            self._redis.hset(
+                name=key_room_participants(room_code),
+                key=user_id,
+                value=json.dumps(state),
+            ),
+        )
+
+    async def remove_participant(self, room_code: str, user_id: str) -> None:
+        """Remove a user from the active participants hash."""
+        await cast(
+            "Awaitable[Any]",
+            self._redis.hdel(key_room_participants(room_code), user_id),
+        )
+
+    async def get_participants(self, room_code: str) -> dict[str, dict]:
+        """Fetch all connected participants for the room.
+
+        Returns a dict mapping user_id to their JSON-parsed state.
+        """
+        raw_data = await cast(
+            "Awaitable[dict[Any, Any]]",
+            self._redis.hgetall(key_room_participants(room_code)),
+        )
+        return {
+            user_id: json.loads(state_str) for user_id, state_str in raw_data.items()
+        }
+
+    # ── Lobby Set ────────────────────────────────────────────────────────
+
+    async def add_to_lobby(
+        self, room_code: str, user_id: str, display_name: str
+    ) -> None:
+        """Place a user in the waiting room/lobby hash."""
+        state = {
+            "display_name": display_name,
+        }
+        await cast(
+            "Awaitable[Any]",
+            self._redis.hset(key_room_lobby(room_code), user_id, json.dumps(state)),
+        )
+
+    async def remove_from_lobby(self, room_code: str, user_id: str) -> None:
+        """Remove a user from the lobby set (e.g. if rejected or left)."""
+        await cast(
+            "Awaitable[Any]", self._redis.hdel(key_room_lobby(room_code), user_id)
+        )
+
+    async def get_lobby(self, room_code: str) -> dict[str, dict]:
+        """Fetch all users currently in the lobby."""
+        raw_data = await cast(
+            "Awaitable[dict[Any, Any]]", self._redis.hgetall(key_room_lobby(room_code))
+        )
+        return {uid: json.loads(val) for uid, val in raw_data.items()}
+
+    async def admit_from_lobby(
+        self, room_code: str, user_id: str, language: str
+    ) -> bool:
+        """Atomically remove a user from the lobby and add them to participants.
+
+        Returns True if the user was actually in the lobby.
+        """
+        # A lightweight transaction (pipeline) to ensure we don't have partial state
+        pipe = self._redis.pipeline()
+        pipe.hdel(key_room_lobby(room_code), user_id)
+
+        state = {
+            "status": "connected",
+            "language": language,
+            "hardware_ready": True,
+        }
+        pipe.hset(
+            name=key_room_participants(room_code), key=user_id, value=json.dumps(state)
+        )
+
+        results = await pipe.execute()
+        # results[0] is the result of srem. 1 means removed, 0 means wasn't there.
+        return bool(results[0])
+
+    # ── Active Speaker ───────────────────────────────────────────────────
+
+    async def set_active_speaker(
+        self, room_code: str, user_id: str, ttl_seconds: int = 5
+    ) -> None:
+        """Update the current active speaker.
+
+        TTL ensures the speaker resets if the client disconnects or stops sending
+        audio levels.
+        """
+        await self._redis.set(
+            name=key_room_active_speaker(room_code), value=user_id, ex=ttl_seconds
+        )
+
+    async def get_active_speaker(self, room_code: str) -> str | None:
+        """Get the ID of the current active speaker, if any."""
+        return await self._redis.get(key_room_active_speaker(room_code))  # type: ignore[no-any-return]
+
+    # ── Room Lifecycle ───────────────────────────────────────────────────
+
+    async def cleanup_room(self, room_code: str) -> None:
+        """Wipe all ephemeral state for the given room when the meeting ends."""
+        keys = tuple(
+            filter(
+                None,
+                [
+                    key_room_participants(room_code),
+                    key_room_lobby(room_code),
+                    key_room_active_speaker(room_code),
+                ],
+            )
+        )
+        if keys:
+            await self._redis.delete(*keys)
+            logger.info("Cleaned up Redis state for room %s", room_code)
