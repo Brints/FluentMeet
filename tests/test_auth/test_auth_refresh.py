@@ -233,7 +233,9 @@ class TestRefreshTokenSuccess:
         # Manually seed the JTI into fake Redis (as the login endpoint would)
         import asyncio
 
-        asyncio.run(token_store.save_refresh_token(email=email, jti=jti, ttl_seconds=ttl))
+        asyncio.run(
+            token_store.save_refresh_token(email=email, jti=jti, ttl_seconds=ttl)
+        )
 
         response = client.post(_URL, cookies={"refresh_token": raw_token})
 
@@ -255,7 +257,9 @@ class TestRefreshTokenSuccess:
 
         import asyncio
 
-        asyncio.run(token_store.save_refresh_token(email=email, jti=jti, ttl_seconds=ttl))
+        asyncio.run(
+            token_store.save_refresh_token(email=email, jti=jti, ttl_seconds=ttl)
+        )
 
         response = client.post(_URL, cookies={"refresh_token": raw_token})
 
@@ -278,12 +282,16 @@ class TestRefreshTokenSuccess:
 
         import asyncio
 
-        asyncio.run(token_store.save_refresh_token(email=email, jti=jti, ttl_seconds=ttl))
+        asyncio.run(
+            token_store.save_refresh_token(email=email, jti=jti, ttl_seconds=ttl)
+        )
 
         client.post(_URL, cookies={"refresh_token": raw_token})
 
         # Old JTI must no longer exist in Redis
-        still_valid = asyncio.run(token_store.is_refresh_token_valid(email=email, jti=jti))
+        still_valid = asyncio.run(
+            token_store.is_refresh_token_valid(email=email, jti=jti)
+        )
         assert not still_valid
 
 
@@ -303,7 +311,9 @@ class TestRefreshTokenMissingCookie:
 class TestRefreshTokenInvalid:
     """Tampered or expired tokens."""
 
-    def test_returns_401_for_garbage_token(self, client: TestClient, db_session: Session) -> None:
+    def test_returns_401_for_garbage_token(
+        self, client: TestClient, db_session: Session
+    ) -> None:
         _seed_user(db_session)
         response = client.post(_URL, cookies={"refresh_token": "this.is.garbage"})
 
@@ -341,7 +351,9 @@ class TestRefreshTokenReuse:
         # Seed a second "live" token for the same user to confirm it also
         # gets wiped during the breach response.
         _, jti2, ttl2 = _make_refresh_cookie(email)
-        asyncio.run(token_store.save_refresh_token(email=email, jti=jti2, ttl_seconds=ttl2))
+        asyncio.run(
+            token_store.save_refresh_token(email=email, jti=jti2, ttl_seconds=ttl2)
+        )
 
         # Do NOT seed jti (simulate: old token already rotated/revoked)
         # Attempt to use it — this is a reuse attack
@@ -351,7 +363,9 @@ class TestRefreshTokenReuse:
         assert response.json()["code"] == "REFRESH_TOKEN_REUSE"
 
         # The second live token should also be wiped
-        still_valid = asyncio.run(token_store.is_refresh_token_valid(email=email, jti=jti2))
+        still_valid = asyncio.run(
+            token_store.is_refresh_token_valid(email=email, jti=jti2)
+        )
         assert not still_valid
 
 
@@ -370,7 +384,9 @@ class TestRefreshTokenDeactivatedAccount:
 
         import asyncio
 
-        asyncio.run(token_store.save_refresh_token(email=email, jti=jti, ttl_seconds=ttl))
+        asyncio.run(
+            token_store.save_refresh_token(email=email, jti=jti, ttl_seconds=ttl)
+        )
 
         response = client.post(_URL, cookies={"refresh_token": raw_token})
 
@@ -389,7 +405,9 @@ class TestRefreshTokenDeactivatedAccount:
 
         import asyncio
 
-        asyncio.run(token_store.save_refresh_token(email=email, jti=jti, ttl_seconds=ttl))
+        asyncio.run(
+            token_store.save_refresh_token(email=email, jti=jti, ttl_seconds=ttl)
+        )
 
         response = client.post(_URL, cookies={"refresh_token": raw_token})
 

@@ -9,7 +9,9 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class RoomSettings(BaseModel):
-    lock_room: bool | None = Field(default=None, description="Require host to admit guests.")
+    lock_room: bool | None = Field(
+        default=None, description="Require host to admit guests."
+    )
     enable_transcription: bool | None = Field(
         default=None, description="Enable live transcription."
     )
@@ -33,7 +35,9 @@ class RoomConfigUpdate(RoomSettings):
 
 
 class InviteRequest(BaseModel):
-    emails: list[EmailStr] = Field(..., max_length=20, description="List of emails to invite.")
+    emails: list[EmailStr] = Field(
+        ..., max_length=20, description="List of emails to invite."
+    )
 
 
 class JoinRoomRequest(BaseModel):

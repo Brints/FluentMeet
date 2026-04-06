@@ -142,9 +142,13 @@ class StorageService:
             A :class:`DeleteResult` indicating success or not-found.
         """
         try:
-            response = cloudinary_uploader.destroy(public_id, resource_type=resource_type)
+            response = cloudinary_uploader.destroy(
+                public_id, resource_type=resource_type
+            )
             result = response.get("result", "error")
-            logger.info("Deleted asset %s (type=%s): %s", public_id, resource_type, result)
+            logger.info(
+                "Deleted asset %s (type=%s): %s", public_id, resource_type, result
+            )
             return DeleteResult(public_id=public_id, result=result)
         except Exception as exc:
             logger.error("Cloudinary delete failed for %s: %s", public_id, exc)
@@ -165,7 +169,9 @@ class StorageService:
         if content_type not in allowed_types:
             allowed = ", ".join(sorted(allowed_types))
             raise FileValidationError(
-                message=(f"File type '{content_type}' is not allowed. Accepted types: {allowed}."),
+                message=(
+                    f"File type '{content_type}' is not allowed. Accepted types: {allowed}."
+                ),
                 code="INVALID_FILE_TYPE",
             )
 

@@ -55,7 +55,9 @@ class KafkaProducer:
             raise KafkaPublishError("Kafka producer is not started")
         await self._producer.client.force_metadata_update()
 
-    async def send(self, topic: str, event: BaseEvent[Any], key: str | None = None) -> None:
+    async def send(
+        self, topic: str, event: BaseEvent[Any], key: str | None = None
+    ) -> None:
         """
         Serialize and send an event to a Kafka topic.
         """

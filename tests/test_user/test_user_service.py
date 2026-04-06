@@ -107,7 +107,9 @@ def test_update_user_skips_none_values(
     user_service: UserService,
     sample_user: User,
 ) -> None:
-    updated = user_service.update_user(sample_user, {"full_name": None, "speaking_language": "es"})
+    updated = user_service.update_user(
+        sample_user, {"full_name": None, "speaking_language": "es"}
+    )
     assert updated.full_name == "Test User"  # unchanged (None skipped)
     assert updated.speaking_language == "es"
 
@@ -137,7 +139,9 @@ def test_soft_delete_sets_deleted_at_and_deactivates(
 
     user_service.soft_delete_user(sample_user)
 
-    refreshed = db_session.execute(select(User).where(User.id == sample_user.id)).scalar_one()
+    refreshed = db_session.execute(
+        select(User).where(User.id == sample_user.id)
+    ).scalar_one()
     assert refreshed.deleted_at is not None
     assert refreshed.is_active is False
 
@@ -163,7 +167,9 @@ def test_hard_delete_removes_user_and_tokens(
 
     # User should be gone.
     assert (
-        db_session.execute(select(User).where(User.id == sample_user.id)).scalar_one_or_none()
+        db_session.execute(
+            select(User).where(User.id == sample_user.id)
+        ).scalar_one_or_none()
         is None
     )
     # Token should be gone.

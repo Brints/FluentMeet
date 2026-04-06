@@ -110,7 +110,9 @@ class TestUploadImage:
             "app.external_services.cloudinary.service.cloudinary_uploader.upload",
             return_value=fake_response,
         ):
-            result = await storage_service.upload_image(file, folder="fluentmeet/avatars")
+            result = await storage_service.upload_image(
+                file, folder="fluentmeet/avatars"
+            )
 
         assert isinstance(result, UploadResult)
         assert result.public_id == "fluentmeet/avatars/abc"
@@ -155,7 +157,9 @@ class TestUploadVideo:
             "app.external_services.cloudinary.service.cloudinary_uploader.upload",
             return_value=fake_response,
         ):
-            result = await storage_service.upload_video(file, folder="fluentmeet/recordings")
+            result = await storage_service.upload_video(
+                file, folder="fluentmeet/recordings"
+            )
 
         assert isinstance(result, UploadResult)
         assert result.resource_type == "video"
@@ -189,7 +193,9 @@ class TestDeleteAsset:
         assert result.result == "not found"
 
     @pytest.mark.asyncio
-    async def test_delete_api_error_raises(self, storage_service: StorageService) -> None:
+    async def test_delete_api_error_raises(
+        self, storage_service: StorageService
+    ) -> None:
         with (
             patch(
                 "app.external_services.cloudinary.service.cloudinary_uploader.destroy",

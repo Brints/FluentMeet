@@ -25,7 +25,9 @@ class AuthVerificationService:
         self.email_producer = email_producer
 
     def create_verification_token(self, user_id: uuid.UUID) -> VerificationToken:
-        expires_at = datetime.now(UTC) + timedelta(hours=settings.VERIFICATION_TOKEN_EXPIRE_HOURS)
+        expires_at = datetime.now(UTC) + timedelta(
+            hours=settings.VERIFICATION_TOKEN_EXPIRE_HOURS
+        )
         verification_token = VerificationToken(user_id=user_id, expires_at=expires_at)
         self.db.add(verification_token)
         self.db.commit()
@@ -40,7 +42,9 @@ class AuthVerificationService:
             )
 
         parsed_token = self._validate_token_format(token)
-        statement = select(VerificationToken).where(VerificationToken.token == parsed_token)
+        statement = select(VerificationToken).where(
+            VerificationToken.token == parsed_token
+        )
         verification_token = self.db.execute(statement).scalar_one_or_none()
 
         if verification_token is None:
@@ -92,7 +96,9 @@ class AuthVerificationService:
 
         token = self.create_verification_token(user_id=user.id)
 
-        verification_link = f"{settings.FRONTEND_BASE_URL}/verify-email?token={token.token}"
+        verification_link = (
+            f"{settings.FRONTEND_BASE_URL}/verify-email?token={token.token}"
+        )
         await self.email_producer.send_email(
             to=user.email,
             subject="Verify your FluentMeet account",

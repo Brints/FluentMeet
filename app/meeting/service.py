@@ -154,7 +154,9 @@ class MeetingService:
             raise NotFoundException(message="Room not found.")
 
         if room.host_id != host.id:
-            raise ForbiddenException(message="Only the host can view live room state payload.")
+            raise ForbiddenException(
+                message="Only the host can view live room state payload."
+            )
 
         active = await self.state.get_participants(room_code)
         lobby = await self.state.get_lobby(room_code)
@@ -216,11 +218,15 @@ class MeetingService:
 
         ptc = None
         if user_uuid or guest_uuid:
-            ptc = self.repo.get_participant(room.id, user_id=user_uuid, guest_session_id=guest_uuid)
+            ptc = self.repo.get_participant(
+                room.id, user_id=user_uuid, guest_session_id=guest_uuid
+            )
 
         is_rejoining = ptc is not None
 
-        tracking_id = str(user.id) if user else (guest_session_id if guest_session_id else None)
+        tracking_id = (
+            str(user.id) if user else (guest_session_id if guest_session_id else None)
+        )
 
         if not user and not is_rejoining and not guest_name:
             raise BadRequestException(
@@ -228,7 +234,9 @@ class MeetingService:
             )
 
         display_name = (
-            user.full_name or user.email if user else (ptc.display_name if ptc else guest_name)
+            user.full_name or user.email
+            if user
+            else (ptc.display_name if ptc else guest_name)
         )
 
         new_guest_token = None
@@ -254,7 +262,9 @@ class MeetingService:
     ) -> dict | None:
         """Return a lobby response dict if the user must wait, else None."""
         max_cap = room.settings.get("max_participants", 20)
-        if len(live_pts) >= max_cap and (not tracking_id or tracking_id not in live_pts):
+        if len(live_pts) >= max_cap and (
+            not tracking_id or tracking_id not in live_pts
+        ):
             raise BadRequestException(
                 code="ROOM_FULL",
                 message=f"The room has reached its maximum capacity of {max_cap} participants.",
@@ -404,7 +414,9 @@ class MeetingService:
         # 2. DB
         user_uuid = user.id if user else None
         guest_uuid = uuid.UUID(guest_session_id) if guest_session_id else None
-        ptc = self.repo.get_participant(room.id, user_id=user_uuid, guest_session_id=guest_uuid)
+        ptc = self.repo.get_participant(
+            room.id, user_id=user_uuid, guest_session_id=guest_uuid
+        )
         if ptc:
             ptc.left_at = utc_now()
             self.repo.update_participant(ptc)
@@ -478,7 +490,9 @@ class MeetingService:
     ) -> dict:
         """Returns paginated history tuple handled by repo."""
         offset = (page - 1) * page_size
-        total, records = self.repo.get_meeting_history(user_id, role_filter, offset, page_size)
+        total, records = self.repo.get_meeting_history(
+            user_id, role_filter, offset, page_size
+        )
 
         items = []
         for row in records:
@@ -498,7 +512,9 @@ class MeetingService:
 
     # ── Email Invitations ────────────────────────────────────────────────
 
-    async def invite_participants(self, host: User, room_code: str, emails: list[str]) -> dict:
+    async def invite_participants(
+        self, host: User, room_code: str, emails: list[str]
+    ) -> dict:
         """Host bulk-invites participants via email."""
         room = self.repo.get_room_by_code(room_code)
         if not room:

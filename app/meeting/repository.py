@@ -25,7 +25,9 @@ class MeetingRepository:
         return room
 
     def get_room_by_code(self, room_code: str) -> Room | None:
-        return self.db.execute(select(Room).where(Room.room_code == room_code)).scalar_one_or_none()
+        return self.db.execute(
+            select(Room).where(Room.room_code == room_code)
+        ).scalar_one_or_none()
 
     def room_code_exists(self, room_code: str) -> bool:
         return (
@@ -95,7 +97,11 @@ class MeetingRepository:
                     (
                         Room.ended_at.isnot(None),
                         func.round(
-                            (func.julianday(Room.ended_at) - func.julianday(Room.created_at)) * 1440
+                            (
+                                func.julianday(Room.ended_at)
+                                - func.julianday(Room.created_at)
+                            )
+                            * 1440
                         ),
                     ),
                     else_=None,
@@ -103,7 +109,9 @@ class MeetingRepository:
                 func.count(Participant.id).label("participant_count"),
                 # Subquery to get the requesting user's role in this room
                 select(Participant.role)
-                .where(and_(Participant.room_id == Room.id, Participant.user_id == user_id))
+                .where(
+                    and_(Participant.room_id == Room.id, Participant.user_id == user_id)
+                )
                 .correlate(Room)
                 .scalar_subquery()
                 .label("role"),
@@ -137,7 +145,11 @@ class MeetingRepository:
             base_query = base_query.where(
                 or_(
                     Room.host_id == user_id,
-                    Room.id.in_(select(Participant.room_id).where(Participant.user_id == user_id)),
+                    Room.id.in_(
+                        select(Participant.room_id).where(
+                            Participant.user_id == user_id
+                        )
+                    ),
                 )
             )
 
@@ -147,7 +159,9 @@ class MeetingRepository:
 
         # 2. Get paginated results
         paginated_query = (
-            base_query.order_by(Room.ended_at.desc().nulls_last()).offset(offset).limit(limit)
+            base_query.order_by(Room.ended_at.desc().nulls_last())
+            .offset(offset)
+            .limit(limit)
         )
         results = self.db.execute(paginated_query).all()
 

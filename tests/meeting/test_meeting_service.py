@@ -146,7 +146,9 @@ class TestCreateRoom:
         repo.create_room.side_effect = lambda r: r
         repo.create_participant.side_effect = lambda p: p
 
-        room = svc.create_room(host=host, name="R", room_settings=None, scheduled_at=None)
+        room = svc.create_room(
+            host=host, name="R", room_settings=None, scheduled_at=None
+        )
         assert room is not None
         assert repo.room_code_exists.call_count == 4
 
@@ -156,7 +158,9 @@ class TestCreateRoom:
 
         repo.room_code_exists.return_value = True  # always collides
 
-        with pytest.raises(InternalServerException, match="Failed to generate room code"):
+        with pytest.raises(
+            InternalServerException, match="Failed to generate room code"
+        ):
             svc.create_room(host=host, name="R", room_settings=None, scheduled_at=None)
 
 
@@ -384,7 +388,9 @@ class TestJoinRoom:
         joiner = _make_user(email="joiner@example.com")
         room = _make_room(host_id=host.id)
 
-        existing_ptc = _make_participant(room_id=room.id, user_id=joiner.id, display_name="Joiner")
+        existing_ptc = _make_participant(
+            room_id=room.id, user_id=joiner.id, display_name="Joiner"
+        )
         existing_ptc.left_at = utc_now()
 
         repo.get_room_by_code.return_value = room
@@ -466,7 +472,9 @@ class TestJoinRoom:
             settings={"lock_room": False, "max_participants": 2},
         )
 
-        existing_ptc = _make_participant(room_id=room.id, user_id=joiner.id, display_name="Joiner")
+        existing_ptc = _make_participant(
+            room_id=room.id, user_id=joiner.id, display_name="Joiner"
+        )
 
         repo.get_room_by_code.return_value = room
         repo.get_participant.return_value = existing_ptc
@@ -553,7 +561,9 @@ class TestAdmitUser:
         repo.get_room_by_code.return_value = room
 
         with pytest.raises(ForbiddenException, match="Only the host"):
-            await svc.admit_user(host=non_host, room_code="ABCDEF123456", target_user_id="u99")
+            await svc.admit_user(
+                host=non_host, room_code="ABCDEF123456", target_user_id="u99"
+            )
 
     @pytest.mark.anyio
     async def test_admit_user_not_in_lobby_raises(self) -> None:
@@ -565,7 +575,9 @@ class TestAdmitUser:
         state.admit_from_lobby.return_value = False
 
         with pytest.raises(BadRequestException, match="not in the lobby"):
-            await svc.admit_user(host=host, room_code="ABCDEF123456", target_user_id="u99")
+            await svc.admit_user(
+                host=host, room_code="ABCDEF123456", target_user_id="u99"
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -695,7 +707,9 @@ class TestGetMeetingHistory:
 
         repo.get_meeting_history.return_value = (1, [fake_row])
 
-        result = svc.get_meeting_history(user_id=uid, role_filter="all", page=1, page_size=20)
+        result = svc.get_meeting_history(
+            user_id=uid, role_filter="all", page=1, page_size=20
+        )
 
         assert result["total"] == 1
         assert result["page"] == 1
@@ -745,7 +759,9 @@ class TestInviteParticipants:
         repo.get_room_by_code.return_value = room
 
         with pytest.raises(ForbiddenException, match="Only the host"):
-            await svc.invite_participants(host=other, room_code="ABCDEF123456", emails=["a@b.com"])
+            await svc.invite_participants(
+                host=other, room_code="ABCDEF123456", emails=["a@b.com"]
+            )
 
     @pytest.mark.anyio
     async def test_invite_missing_room_raises(self) -> None:
@@ -754,7 +770,9 @@ class TestInviteParticipants:
         repo.get_room_by_code.return_value = None
 
         with pytest.raises(NotFoundException):
-            await svc.invite_participants(host=host, room_code="MISSING", emails=["a@b.com"])
+            await svc.invite_participants(
+                host=host, room_code="MISSING", emails=["a@b.com"]
+            )
 
     @pytest.mark.anyio
     async def test_failed_email_captured(self) -> None:

@@ -53,12 +53,16 @@ async def run_audio_test():
 
             try:
                 while True:
-                    response = await asyncio.wait_for(websocket.recv(), timeout=TIMEOUT_SECONDS)
+                    response = await asyncio.wait_for(
+                        websocket.recv(), timeout=TIMEOUT_SECONDS
+                    )
 
                     if isinstance(response, bytes):
                         chunk_count += 1
                         received_chunks.append(response)
-                        print(f"  Received audio chunk #{chunk_count}: {len(response)} bytes")
+                        print(
+                            f"  Received audio chunk #{chunk_count}: {len(response)} bytes"
+                        )
                     else:
                         print(f"  Received text message: {response[:200]}")
 

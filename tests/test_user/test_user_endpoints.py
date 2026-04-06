@@ -180,7 +180,9 @@ class TestGetProfile:
         assert "deleted_at" not in data
         assert "updated_at" not in data
 
-    def test_unauthorized_without_token(self, unauthenticated_client: TestClient) -> None:
+    def test_unauthorized_without_token(
+        self, unauthenticated_client: TestClient
+    ) -> None:
         response = unauthenticated_client.get("/api/v1/users/me")
         assert response.status_code == 401
 
@@ -226,7 +228,9 @@ class TestUpdateProfile:
         assert body["code"] == "VALIDATION_ERROR"
 
     def test_unauthorized(self, unauthenticated_client: TestClient) -> None:
-        response = unauthenticated_client.patch("/api/v1/users/me", json={"full_name": "X"})
+        response = unauthenticated_client.patch(
+            "/api/v1/users/me", json={"full_name": "X"}
+        )
         assert response.status_code == 401
 
 
@@ -297,10 +301,15 @@ class TestDeleteAccount:
         assert response.status_code == 200
         body = response.json()
         assert body["status"] == "ok"
-        assert "deactivated" in body["message"].lower() or "deleted" in body["message"].lower()
+        assert (
+            "deactivated" in body["message"].lower()
+            or "deleted" in body["message"].lower()
+        )
 
         # Verify DB state — user is soft-deleted.
-        refreshed = db_session.execute(select(User).where(User.id == sample_user.id)).scalar_one()
+        refreshed = db_session.execute(
+            select(User).where(User.id == sample_user.id)
+        ).scalar_one()
         assert refreshed.deleted_at is not None
         assert refreshed.is_active is False
 

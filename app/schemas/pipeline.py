@@ -33,13 +33,17 @@ class AudioChunkPayload(BaseModel):
     user_id: str = Field(
         ..., description="Speaker's tracking ID (user UUID or guest session UUID)."
     )
-    sequence_number: int = Field(..., ge=0, description="Monotonically increasing chunk index.")
+    sequence_number: int = Field(
+        ..., ge=0, description="Monotonically increasing chunk index."
+    )
     audio_data: str = Field(..., description="Base64-encoded raw audio bytes.")
     sample_rate: int = Field(default=16000, description="Audio sample rate in Hz.")
     encoding: AudioEncoding = Field(
         default=AudioEncoding.LINEAR16, description="Audio encoding format."
     )
-    source_language: str = Field(default="en", description="Speaker's language (ISO 639-1).")
+    source_language: str = Field(
+        default="en", description="Speaker's language (ISO 639-1)."
+    )
 
 
 class AudioChunkEvent(BaseEvent[AudioChunkPayload]):
@@ -58,11 +62,15 @@ class TranscriptionPayload(BaseModel):
     user_id: str
     sequence_number: int = Field(..., ge=0)
     text: str = Field(..., description="Transcribed text from the audio chunk.")
-    source_language: str = Field(..., description="Detected or declared source language.")
+    source_language: str = Field(
+        ..., description="Detected or declared source language."
+    )
     is_final: bool = Field(
         default=True, description="Whether this is a final transcription or interim."
     )
-    confidence: float = Field(default=0.0, ge=0.0, le=1.0, description="STT confidence score.")
+    confidence: float = Field(
+        default=0.0, ge=0.0, le=1.0, description="STT confidence score."
+    )
 
 
 class TranscriptionEvent(BaseEvent[TranscriptionPayload]):

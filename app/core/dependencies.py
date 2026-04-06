@@ -127,7 +127,9 @@ async def get_current_user_optional(
 ) -> User | None:
     """Attempt to decode JWT and return User if present, otherwise return None."""
     try:
-        user = await get_current_user(token=token, bearer=bearer, db=db, token_store=token_store)
+        user = await get_current_user(
+            token=token, bearer=bearer, db=db, token_store=token_store
+        )
         return user
     except UnauthorizedException:
         # Happens if token is missing or generic Invalid Credentials

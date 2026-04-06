@@ -67,7 +67,9 @@ class ConnectionManager:
         payload = {"type": "broadcast", "sender_id": sender_id, "data": message}
         await self.redis.publish(self._get_channel_name(room_code), json.dumps(payload))
 
-    async def send_to_user(self, room_code: str, target_user_id: str, message: dict) -> None:
+    async def send_to_user(
+        self, room_code: str, target_user_id: str, message: dict
+    ) -> None:
         """Publish a message to a specific user in a room across all instances."""
         payload = {"type": "unicast", "target_user_id": target_user_id, "data": message}
         await self.redis.publish(self._get_channel_name(room_code), json.dumps(payload))

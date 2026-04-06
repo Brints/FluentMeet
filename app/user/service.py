@@ -29,7 +29,9 @@ class UserService:
 
     def get_user_by_id(self, user_id: uuid.UUID) -> User | None:
         """Return the user with *user_id*, or ``None``."""
-        return self.db.execute(select(User).where(User.id == user_id)).scalar_one_or_none()
+        return self.db.execute(
+            select(User).where(User.id == user_id)
+        ).scalar_one_or_none()
 
     # ------------------------------------------------------------------
     # Update
@@ -96,7 +98,9 @@ class UserService:
         user_id = user.id
 
         # Delete associated verification tokens first.
-        self.db.execute(delete(VerificationToken).where(VerificationToken.user_id == user_id))
+        self.db.execute(
+            delete(VerificationToken).where(VerificationToken.user_id == user_id)
+        )
 
         self.db.delete(user)
         self.db.commit()

@@ -152,9 +152,13 @@ class BaseConsumer(abc.ABC):
             event_id_safe,
             settings.KAFKA_MAX_RETRIES,
         )
-        await self._send_to_dlq(event, str(last_error), retries=settings.KAFKA_MAX_RETRIES)
+        await self._send_to_dlq(
+            event, str(last_error), retries=settings.KAFKA_MAX_RETRIES
+        )
 
-    async def _send_to_dlq(self, event: BaseEvent[Any], error_message: str, retries: int) -> None:
+    async def _send_to_dlq(
+        self, event: BaseEvent[Any], error_message: str, retries: int
+    ) -> None:
         """
         Forward a failed event to its Dead Letter Queue topic.
         Wraps it in a DLQEvent — a proper structured schema — instead of

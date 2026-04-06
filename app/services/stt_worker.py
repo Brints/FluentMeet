@@ -91,7 +91,9 @@ class STTWorker(BaseConsumer):
         )
         transcription_event = TranscriptionEvent(payload=transcription_payload)
 
-        await self._producer.send(TEXT_ORIGINAL, transcription_event, key=payload.room_id)
+        await self._producer.send(
+            TEXT_ORIGINAL, transcription_event, key=payload.room_id
+        )
 
         # 4. Log pipeline latency
         elapsed_ms = (time.monotonic() - pipeline_start) * 1000
