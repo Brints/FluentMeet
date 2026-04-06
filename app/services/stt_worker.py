@@ -57,7 +57,9 @@ class STTWorker(BaseConsumer):
         if not settings.DEEPGRAM_API_KEY:
             logger.info("DEEPGRAM_API_KEY not set. Mocking STT response for testing.")
             result: dict[str, Any] = {
-                "text": "Hello, this is a simulated transcription for testing purposes.",
+                "text": (
+                    "Hello, this is a simulated transcription for testing purposes."
+                ),
                 "detected_language": payload.source_language,
                 "confidence": 1.0,
             }

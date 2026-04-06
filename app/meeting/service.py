@@ -267,7 +267,10 @@ class MeetingService:
         ):
             raise BadRequestException(
                 code="ROOM_FULL",
-                message=f"The room has reached its maximum capacity of {max_cap} participants.",
+                message=(
+                    f"The room has reached its maximum"
+                    f" capacity of {max_cap} participants."
+                ),
             )
 
         lock_room = room.settings.get("lock_room", False)

@@ -43,7 +43,9 @@ class InviteRequest(BaseModel):
 class JoinRoomRequest(BaseModel):
     display_name: str | None = Field(
         default=None,
-        description="Required for guests. Authenticated users will use their account name.",
+        description=(
+            "Required for guests. Authenticated users will use their account name."
+        ),
     )
     listening_language: str | None = Field(
         default=None,

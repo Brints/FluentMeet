@@ -61,7 +61,8 @@ async def run_audio_test():
                         chunk_count += 1
                         received_chunks.append(response)
                         print(
-                            f"  Received audio chunk #{chunk_count}: {len(response)} bytes"
+                            f"  Received audio chunk #{chunk_count}:"
+                            f" {len(response)} bytes"
                         )
                     else:
                         print(f"  Received text message: {response[:200]}")
@@ -72,7 +73,9 @@ async def run_audio_test():
                 else:
                     print("\nTimeout reached. No audio data received from pipeline.")
                     print(
-                        "Check server console for 'Egress: SUCCESSFULLY sent' or 'FAILED' messages."
+                        "Check server console for"
+                        " 'Egress: SUCCESSFULLY sent'"
+                        " or 'FAILED' messages."
                     )
                     return
 
@@ -87,7 +90,9 @@ async def run_audio_test():
                 await asyncio.to_thread(OUTPUT_FILE.write_bytes, all_audio)
                 print(f"\nSUCCESS! Saved {len(all_audio)} bytes to '{OUTPUT_FILE}'")
                 print(
-                    f"To play: ffplay -f s16le -sample_rate 16000 -ch_layout mono -i {OUTPUT_FILE}"
+                    "To play: ffplay -f s16le"
+                    " -sample_rate 16000"
+                    f" -ch_layout mono -i {OUTPUT_FILE}"
                 )
 
     except Exception as e:

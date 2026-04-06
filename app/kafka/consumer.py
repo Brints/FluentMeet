@@ -189,7 +189,8 @@ class BaseConsumer(abc.ABC):
         except Exception:
             event_id_safe, dlq_topic_safe = sanitize_log_args(event.event_id, dlq_topic)
             logger.exception(
-                "CRITICAL: Failed to forward event %s to '%s'. Event is permanently lost.",
+                "CRITICAL: Failed to forward event %s to '%s'."
+                " Event is permanently lost.",
                 event_id_safe,
                 dlq_topic_safe,
             )

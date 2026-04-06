@@ -176,14 +176,16 @@ async def audio_websocket(  # noqa: C901
                     payload = event.payload
 
                     logger.info(
-                        "Egress received: room=%s target_lang=%s listening_lang=%s seq=%d",
+                        "Egress received: room=%s target_lang=%s"
+                        " listening_lang=%s seq=%d",
                         payload.room_id,
                         payload.target_language,
                         listening_language,
                         payload.sequence_number,
                     )
                     print(
-                        "Egress received: room=%s target_lang=%s listening_lang=%s seq=%d",
+                        "Egress received: room=%s"
+                        " target_lang=%s listening_lang=%s seq=%d",
                         payload.room_id,
                         payload.target_language,
                         listening_language,
@@ -207,7 +209,8 @@ async def audio_websocket(  # noqa: C901
                         and payload.target_language != listening_language
                     ):
                         print(
-                            f"Egress: skipping lang mismatch target={payload.target_language} "
+                            "Egress: skipping lang mismatch"
+                            f" target={payload.target_language} "
                             f"!= listening={listening_language}"
                         )
                         continue
@@ -249,11 +252,14 @@ async def audio_websocket(  # noqa: C901
                     try:
                         await websocket.send_bytes(audio_bytes)
                         print(
-                            f"Egress: SUCCESSFULLY sent {len(audio_bytes)} bytes via WebSocket"
+                            "Egress: SUCCESSFULLY sent"
+                            f" {len(audio_bytes)} bytes"
+                            " via WebSocket"
                         )
                     except Exception as send_err:
                         print(
-                            f"Egress: WebSocket send failed (but file was saved): {send_err}"
+                            "Egress: WebSocket send failed"
+                            f" (but file was saved): {send_err}"
                         )
 
                 except Exception as frame_err:
