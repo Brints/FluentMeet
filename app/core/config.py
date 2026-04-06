@@ -100,9 +100,7 @@ class Settings(BaseSettings):
     # URL used in transactional email links
     FRONTEND_BASE_URL: str = "http://localhost:3000"
 
-    model_config = SettingsConfigDict(
-        env_file=".env", case_sensitive=True, extra="ignore"
-    )
+    model_config = SettingsConfigDict(env_file=".env", case_sensitive=True, extra="ignore")
 
 
 settings = Settings()

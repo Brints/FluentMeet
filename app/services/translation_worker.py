@@ -99,9 +99,7 @@ class TranslationWorker(BaseConsumer):
                 )
                 translation_event = TranslationEvent(payload=translation_payload)
 
-                await self._producer.send(
-                    TEXT_TRANSLATED, translation_event, key=payload.room_id
-                )
+                await self._producer.send(TEXT_TRANSLATED, translation_event, key=payload.room_id)
 
                 logger.debug(
                     "Translation: seq=%d %s→%s text='%s'",

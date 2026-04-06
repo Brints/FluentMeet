@@ -78,9 +78,7 @@ async def login(
 
     login_response, refresh_token, refresh_ttl = await auth_service.login(payload)
 
-    response = JSONResponse(
-        content=login_response.model_dump(mode="json"), status_code=200
-    )
+    response = JSONResponse(content=login_response.model_dump(mode="json"), status_code=200)
 
     # Set HttpOnly refresh-token cookie
     response.set_cookie(
@@ -113,9 +111,7 @@ async def login(
 )
 def verify_email(
     token: str | None = Query(default=None),
-    auth_verification_service: AuthVerificationService = Depends(
-        get_auth_verification_service
-    ),
+    auth_verification_service: AuthVerificationService = Depends(get_auth_verification_service),
 ) -> VerifyEmailResponse:
     auth_verification_service.verify_email(token=token)
     return VerifyEmailResponse(
@@ -137,9 +133,7 @@ def verify_email(
 async def resend_verification(
     request: Request,
     payload: ResendVerificationRequest,
-    auth_verification_service: AuthVerificationService = Depends(
-        get_auth_verification_service
-    ),
+    auth_verification_service: AuthVerificationService = Depends(get_auth_verification_service),
 ) -> ActionAcknowledgement:
     del request
     try:
@@ -155,9 +149,7 @@ async def resend_verification(
         )
 
     return ActionAcknowledgement(
-        message=(
-            "If an account with that email exists, we have sent a verification email."
-        )
+        message=("If an account with that email exists, we have sent a verification email.")
     )
 
 
@@ -175,10 +167,7 @@ async def forgot_password(
         frontend_base_url=settings.FRONTEND_BASE_URL,
     )
     return ActionAcknowledgement(
-        message=(
-            "If an account with that email exists, we have sent "
-            "password reset instructions."
-        )
+        message=("If an account with that email exists, we have sent password reset instructions.")
     )
 
 

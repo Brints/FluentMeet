@@ -16,6 +16,8 @@ import logging
 from fastapi import WebSocket
 from redis.asyncio import Redis
 
+from app.core.sanitize import log_sanitizer
+
 logger = logging.getLogger(__name__)
 
 
@@ -37,13 +39,21 @@ class ConnectionManager:
             self._start_listening(room_code)
 
         self.active_connections[room_code][user_id] = websocket
-        logger.info("User %s connected to room %s", user_id, room_code)
+        logger.info(
+            "User %s connected to room %s",
+            log_sanitizer.sanitize(user_id),
+            log_sanitizer.sanitize(room_code),
+        )
 
     def disconnect(self, room_code: str, user_id: str) -> None:
         """Remove a WebSocket connection from the manager."""
         if room_code in self.active_connections:
             self.active_connections[room_code].pop(user_id, None)
-            logger.info("User %s disconnected from room %s", user_id, room_code)
+            logger.info(
+                "User %s disconnected from room %s",
+                log_sanitizer.sanitize(user_id),
+                log_sanitizer.sanitize(room_code),
+            )
 
             # Clean up empty rooms
             if not self.active_connections[room_code]:
@@ -57,9 +67,7 @@ class ConnectionManager:
         payload = {"type": "broadcast", "sender_id": sender_id, "data": message}
         await self.redis.publish(self._get_channel_name(room_code), json.dumps(payload))
 
-    async def send_to_user(
-        self, room_code: str, target_user_id: str, message: dict
-    ) -> None:
+    async def send_to_user(self, room_code: str, target_user_id: str, message: dict) -> None:
         """Publish a message to a specific user in a room across all instances."""
         payload = {"type": "unicast", "target_user_id": target_user_id, "data": message}
         await self.redis.publish(self._get_channel_name(room_code), json.dumps(payload))
@@ -108,7 +116,10 @@ class ConnectionManager:
                             try:
                                 await ws.send_json(data)
                             except Exception:
-                                logger.warning("Failed to send message to %s", user_id)
+                                logger.warning(
+                                    "Failed to send message to %s",
+                                    log_sanitizer.sanitize(user_id),
+                                )
 
                 elif msg_type == "unicast":
                     target_id = payload.get("target_user_id")
@@ -118,7 +129,8 @@ class ConnectionManager:
                             await target_ws.send_json(data)
                         except Exception:
                             logger.warning(
-                                "Failed to send unicast message to %s", target_id
+                                "Failed to send unicast message to %s",
+                                log_sanitizer.sanitize(target_id),
                             )
         except asyncio.CancelledError:
             pass

@@ -100,12 +100,8 @@ async def test_translation_worker_handle(mock_producer, base_transcription_event
     worker = TranslationWorker(producer=mock_producer)
 
     with (
-        patch(
-            "app.services.translation_worker.MeetingStateService"
-        ) as _mock_state_class,
-        patch(
-            "app.services.translation_worker.get_deepl_translation_service"
-        ) as mock_get_deepl,
+        patch("app.services.translation_worker.MeetingStateService") as _mock_state_class,
+        patch("app.services.translation_worker.get_deepl_translation_service") as mock_get_deepl,
     ):
         mock_state = AsyncMock()
         # Two users with different languages (fr and es)
@@ -118,12 +114,10 @@ async def test_translation_worker_handle(mock_producer, base_transcription_event
 
         mock_deepl = AsyncMock()
         mock_deepl.supports_language.return_value = True
-        mock_deepl.translate.side_effect = (
-            lambda _text, _source_language, target_language: {
-                "translated_text": f"Transl => {target_language}",
-                "latency_ms": 100,
-            }
-        )
+        mock_deepl.translate.side_effect = lambda _text, _source_language, target_language: {
+            "translated_text": f"Transl => {target_language}",
+            "latency_ms": 100,
+        }
         mock_get_deepl.return_value = mock_deepl
 
         await worker.handle(base_transcription_event)

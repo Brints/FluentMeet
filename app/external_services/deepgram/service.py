@@ -76,9 +76,7 @@ class DeepgramSTTService:
         return {
             "text": alternative.get("transcript", ""),
             "confidence": alternative.get("confidence", 0.0),
-            "detected_language": data.get("results", {}).get(
-                "detected_language", language
-            ),
+            "detected_language": data.get("results", {}).get("detected_language", language),
             "latency_ms": round(elapsed_ms, 1),
         }
 

@@ -107,9 +107,7 @@ async def upload_avatar(
         old_public_id = _extract_public_id(current_user.avatar_url)
         if old_public_id:
             try:
-                await storage_service.delete_asset(
-                    old_public_id, resource_type=RESOURCE_TYPE_IMAGE
-                )
+                await storage_service.delete_asset(old_public_id, resource_type=RESOURCE_TYPE_IMAGE)
             except Exception as exc:
                 logger.warning(
                     f"Failed to delete old avatar for user %s — continuing. {exc}",

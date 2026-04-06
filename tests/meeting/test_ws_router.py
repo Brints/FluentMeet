@@ -61,9 +61,7 @@ def mock_kafka_consumer():
 @pytest.mark.usefixtures("mock_room_participant")
 def test_signaling_websocket(mock_connection_manager):
     # This will connect, send a text message, and then close
-    with client.websocket_connect(
-        "/api/v1/ws/signaling/room1?token=mock_token"
-    ) as websocket:
+    with client.websocket_connect("/api/v1/ws/signaling/room1?token=mock_token") as websocket:
         websocket.send_text(json.dumps({"type": "offer", "target_user_id": "user2"}))
         # The connection manager's send_to_user should be called
 
@@ -85,9 +83,7 @@ def test_audio_websocket_ingest(
     # We will simulate the async iterable for the consumer to yield nothing
     mock_kafka_consumer.__aiter__.return_value = []
 
-    with client.websocket_connect(
-        "/api/v1/ws/audio/room1?token=mock_token"
-    ) as websocket:
+    with client.websocket_connect("/api/v1/ws/audio/room1?token=mock_token") as websocket:
         websocket.send_bytes(b"fake_audio_chunk")
         time.sleep(0.1)  # Yield to event loop for background tasks to process
 

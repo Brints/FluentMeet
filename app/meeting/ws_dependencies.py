@@ -31,27 +31,19 @@ def authenticate_ws(token: str = Query(...), db: Session = Depends(get_db)) -> s
     )
 
     try:
-        payload = jwt.decode(
-            token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
-        )
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
     except JWTError as err:
         raise error_exc from err
 
     raw_sub = payload.get("sub")
     token_type = payload.get("type", "access")
 
-    if (
-        not raw_sub
-        or not isinstance(raw_sub, str)
-        or token_type not in ("access", "guest")
-    ):
+    if not raw_sub or not isinstance(raw_sub, str) or token_type not in ("access", "guest"):
         raise error_exc
 
     if token_type == "access":
         # The 'sub' is an email; we need the UUID to match Redis participant state
-        user = db.execute(
-            select(User).where(User.email == raw_sub)
-        ).scalar_one_or_none()
+        user = db.execute(select(User).where(User.email == raw_sub)).scalar_one_or_none()
         if not user:
             raise error_exc
         return str(user.id)

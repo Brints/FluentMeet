@@ -59,9 +59,7 @@ class FakeRedis:
         final_key = name or key
         self._store[final_key] = value
 
-    async def get(
-        self, key: str | None = None, *, name: str | None = None
-    ) -> str | None:
+    async def get(self, key: str | None = None, *, name: str | None = None) -> str | None:
         final_key = name or key
         return self._store.get(final_key)
 
@@ -88,9 +86,7 @@ class FakeRedis:
         import fnmatch
 
         all_keys = list(self._store.keys()) + list(self._hashes.keys())
-        matched = (
-            [k for k in all_keys if fnmatch.fnmatch(k, match)] if match else all_keys
-        )
+        matched = [k for k in all_keys if fnmatch.fnmatch(k, match)] if match else all_keys
         return 0, matched
 
     # -- Hash commands --
@@ -266,9 +262,7 @@ async def client(
 
     limiter.enabled = False
     transport = ASGITransport(app=app)
-    async with httpx.AsyncClient(
-        transport=transport, base_url="http://test"
-    ) as async_client:
+    async with httpx.AsyncClient(transport=transport, base_url="http://test") as async_client:
         yield async_client
     limiter.enabled = True
     app.dependency_overrides.clear()
@@ -374,9 +368,7 @@ class TestCreateRoomRoute:
 
 class TestGetRoomRoute:
     @pytest.mark.asyncio
-    async def test_get_room_details(
-        self, client: httpx.AsyncClient, db_session: Session
-    ) -> None:
+    async def test_get_room_details(self, client: httpx.AsyncClient, db_session: Session) -> None:
         _seed_user(db_session)
         token = await _login(client)
 
@@ -480,9 +472,7 @@ class TestJoinRoomRoute:
 
 class TestLeaveRoomRoute:
     @pytest.mark.asyncio
-    async def test_host_leaves_room(
-        self, client: httpx.AsyncClient, db_session: Session
-    ) -> None:
+    async def test_host_leaves_room(self, client: httpx.AsyncClient, db_session: Session) -> None:
         _seed_user(db_session)
         token = await _login(client)
 
@@ -512,9 +502,7 @@ class TestLeaveRoomRoute:
 
 class TestEndRoomRoute:
     @pytest.mark.asyncio
-    async def test_host_ends_room(
-        self, client: httpx.AsyncClient, db_session: Session
-    ) -> None:
+    async def test_host_ends_room(self, client: httpx.AsyncClient, db_session: Session) -> None:
         _seed_user(db_session)
         token = await _login(client)
 

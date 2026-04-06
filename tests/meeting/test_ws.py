@@ -90,9 +90,7 @@ async def test_authenticate_ws_valid_token():
 async def test_authenticate_ws_invalid_token():
     from jose import JWTError
 
-    with patch(
-        "app.meeting.ws_dependencies.jwt.decode", side_effect=JWTError("Invalid")
-    ):
+    with patch("app.meeting.ws_dependencies.jwt.decode", side_effect=JWTError("Invalid")):
         with pytest.raises(WebSocketException) as exc:
             authenticate_ws("invalid_token", db=MagicMock())
 
@@ -103,9 +101,7 @@ async def test_authenticate_ws_invalid_token():
 async def test_assert_room_participant_valid():
     with patch("app.meeting.ws_dependencies.MeetingStateService") as mock_service_class:
         mock_service = MagicMock()
-        mock_service.get_participants = AsyncMock(
-            return_value={"user1": {"language": "es"}}
-        )
+        mock_service.get_participants = AsyncMock(return_value={"user1": {"language": "es"}})
         mock_service_class.return_value = mock_service
 
         state = await assert_room_participant("room1", "user1")
@@ -116,9 +112,7 @@ async def test_assert_room_participant_valid():
 async def test_assert_room_participant_invalid():
     with patch("app.meeting.ws_dependencies.MeetingStateService") as mock_service_class:
         mock_service = MagicMock()
-        mock_service.get_participants = AsyncMock(
-            return_value={"user2": {"language": "fr"}}
-        )
+        mock_service.get_participants = AsyncMock(return_value={"user2": {"language": "fr"}})
         mock_service_class.return_value = mock_service
 
         with pytest.raises(WebSocketException) as exc:

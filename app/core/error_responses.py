@@ -31,9 +31,7 @@ def create_error_response(
             error_details.append(
                 ErrorDetail(
                     field=detail.get("field"),
-                    message=detail.get("msg")
-                    or detail.get("message")
-                    or "Unknown error",
+                    message=detail.get("msg") or detail.get("message") or "Unknown error",
                 )
             )
 

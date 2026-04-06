@@ -11,6 +11,7 @@ room's WebSocket connections.
 import base64
 import logging
 
+from app.core.sanitize import log_sanitizer
 from app.kafka.manager import get_kafka_manager
 from app.kafka.topics import AUDIO_RAW
 from app.schemas.pipeline import (
@@ -85,8 +86,8 @@ class AudioIngestService:
         logger.debug(
             "Published audio chunk seq=%d for user=%s in room=%s",
             seq,
-            user_id,
-            room_id,
+            log_sanitizer.sanitize(user_id),
+            log_sanitizer.sanitize(room_id),
         )
 
 

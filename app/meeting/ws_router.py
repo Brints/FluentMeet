@@ -11,6 +11,7 @@ from aiokafka import AIOKafkaConsumer  # type: ignore[import-untyped]
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 
 from app.core.config import settings
+from app.core.sanitize import log_sanitizer
 from app.kafka.topics import AUDIO_SYNTHESIZED, TEXT_ORIGINAL, TEXT_TRANSLATED
 from app.meeting.state import MeetingStateService
 from app.meeting.ws_dependencies import assert_room_participant, authenticate_ws
@@ -57,9 +58,7 @@ async def signaling_websocket(
                 if target_user_id:
                     await manager.send_to_user(room_code, target_user_id, payload)
                 else:
-                    await manager.broadcast_to_room(
-                        room_code, payload, sender_id=user_id
-                    )
+                    await manager.broadcast_to_room(room_code, payload, sender_id=user_id)
             except json.JSONDecodeError:
                 logger.warning("Invalid JSON received on signaling WS")
 
@@ -125,7 +124,7 @@ async def audio_websocket(  # noqa: C901
                         source_language=participant_state.get("language", "en"),
                     )
         except WebSocketDisconnect:
-            logger.info("Audio WS client disconnected: %s", user_id)
+            logger.info("Audio WS client disconnected: %s", log_sanitizer.sanitize(user_id))
 
     # --- Shared event so egress consumer is ready before we start ingesting ---
     egress_ready = asyncio.Event()
@@ -196,13 +195,8 @@ async def audio_websocket(  # noqa: C901
                     # only deliver audio matching the listener's language.
                     # For single-user testing, skip the filter so the speaker
                     # can hear their own translated audio.
-                    participants = await MeetingStateService().get_participants(
-                        room_code
-                    )
-                    if (
-                        len(participants) > 1
-                        and payload.target_language != listening_language
-                    ):
+                    participants = await MeetingStateService().get_participants(room_code)
+                    if len(participants) > 1 and payload.target_language != listening_language:
                         print(
                             f"Egress: skipping lang mismatch target={payload.target_language} "
                             f"!= listening={listening_language}"
@@ -217,9 +211,7 @@ async def audio_websocket(  # noqa: C901
                         logger.debug("Dropped stale audio frame from %s", speaker_key)
                         continue
 
-                    highest_seq[speaker_key] = max(
-                        current_highest, payload.sequence_number
-                    )
+                    highest_seq[speaker_key] = max(current_highest, payload.sequence_number)
 
                     # Send to client (binary)
                     audio_bytes = base64.b64decode(payload.audio_data)
@@ -245,13 +237,9 @@ async def audio_websocket(  # noqa: C901
 
                     try:
                         await websocket.send_bytes(audio_bytes)
-                        print(
-                            f"Egress: SUCCESSFULLY sent {len(audio_bytes)} bytes via WebSocket"
-                        )
+                        print(f"Egress: SUCCESSFULLY sent {len(audio_bytes)} bytes via WebSocket")
                     except Exception as send_err:
-                        print(
-                            f"Egress: WebSocket send failed (but file was saved): {send_err}"
-                        )
+                        print(f"Egress: WebSocket send failed (but file was saved): {send_err}")
 
                 except Exception as frame_err:
                     print(f"Error processing egress frame: {frame_err}")
@@ -273,9 +261,7 @@ async def audio_websocket(  # noqa: C901
 
     try:
         # Run until either task fails or disconnects
-        _done, pending = await asyncio.wait(
-            [task1, task2], return_when=asyncio.FIRST_COMPLETED
-        )
+        _done, pending = await asyncio.wait([task1, task2], return_when=asyncio.FIRST_COMPLETED)
         # Cancel whatever is still running
         for t in pending:
             t.cancel()

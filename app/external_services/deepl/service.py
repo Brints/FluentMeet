@@ -131,9 +131,7 @@ class OpenAITranslationFallback:
             A dict with ``translated_text``, ``latency_ms``.
         """
         if not settings.OPENAI_API_KEY:
-            raise RuntimeError(
-                "OPENAI_API_KEY is not configured for translation fallback."
-            )
+            raise RuntimeError("OPENAI_API_KEY is not configured for translation fallback.")
 
         headers = {
             "Authorization": f"Bearer {settings.OPENAI_API_KEY}",

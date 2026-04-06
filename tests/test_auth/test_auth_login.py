@@ -229,9 +229,7 @@ class TestLoginSuccess:
         assert body["token_type"] == "bearer"
         assert body["expires_in"] > 0
 
-    def test_sets_httponly_refresh_cookie(
-        self, client: TestClient, db_session: Session
-    ) -> None:
+    def test_sets_httponly_refresh_cookie(self, client: TestClient, db_session: Session) -> None:
         _seed_user(db_session)
 
         response = client.post(
@@ -243,9 +241,7 @@ class TestLoginSuccess:
         cookies = response.cookies
         assert "refresh_token" in cookies
 
-    def test_refresh_token_not_in_body(
-        self, client: TestClient, db_session: Session
-    ) -> None:
+    def test_refresh_token_not_in_body(self, client: TestClient, db_session: Session) -> None:
         _seed_user(db_session)
 
         response = client.post(
@@ -279,9 +275,7 @@ class TestLoginSuccess:
 class TestLoginInvalidCredentials:
     """``POST /auth/login`` — wrong password / non-existent email (401)."""
 
-    def test_wrong_password_returns_401(
-        self, client: TestClient, db_session: Session
-    ) -> None:
+    def test_wrong_password_returns_401(self, client: TestClient, db_session: Session) -> None:
         _seed_user(db_session)
 
         response = client.post(
@@ -327,9 +321,7 @@ class TestLoginInvalidCredentials:
 class TestLoginUnverifiedAccount:
     """``POST /auth/login`` — unverified email (403)."""
 
-    def test_unverified_user_returns_403(
-        self, client: TestClient, db_session: Session
-    ) -> None:
+    def test_unverified_user_returns_403(self, client: TestClient, db_session: Session) -> None:
         _seed_user(db_session, is_verified=False)
 
         response = client.post(
@@ -349,9 +341,7 @@ class TestLoginUnverifiedAccount:
 class TestLoginDeletedAccount:
     """``POST /auth/login`` — soft-deleted user (403)."""
 
-    def test_deleted_user_returns_403(
-        self, client: TestClient, db_session: Session
-    ) -> None:
+    def test_deleted_user_returns_403(self, client: TestClient, db_session: Session) -> None:
         _seed_user(db_session, deleted_at=datetime.now(UTC))
 
         response = client.post(

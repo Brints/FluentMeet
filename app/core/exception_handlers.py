@@ -57,9 +57,7 @@ async def http_exception_handler(_request: Request, exc: Any) -> JSONResponse:
     )
 
 
-async def unhandled_exception_handler(
-    _request: Request, exc: Exception
-) -> JSONResponse:
+async def unhandled_exception_handler(_request: Request, exc: Exception) -> JSONResponse:
     """
     Handler for all other unhandled exceptions (500).
     """

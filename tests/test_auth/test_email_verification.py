@@ -111,9 +111,7 @@ def test_verify_email_missing_token_returns_custom_error(client: TestClient) -> 
 
 
 def test_verify_email_invalid_token_returns_custom_error(client: TestClient) -> None:
-    response = client.get(
-        "/api/v1/auth/verify-email?token=8f14e45f-ceea-4f6a-9fef-3d4d3e0d1be1"
-    )
+    response = client.get("/api/v1/auth/verify-email?token=8f14e45f-ceea-4f6a-9fef-3d4d3e0d1be1")
 
     assert response.status_code == 400
     assert response.json() == {
@@ -182,9 +180,7 @@ def test_resend_verification_generates_new_token_and_enqueues_email(
 
     assert response.status_code == 200
     assert response.json() == {
-        "message": (
-            "If an account with that email exists, we have sent a verification email."
-        )
+        "message": ("If an account with that email exists, we have sent a verification email.")
     }
     email_producer_mock.send_email.assert_awaited_once()
 

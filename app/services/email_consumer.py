@@ -42,9 +42,7 @@ class EmailTemplateRenderer:
 class MailgunEmailSender:
     """Sends emails via Mailgun's /messages endpoint."""
 
-    def __init__(
-        self, timeout_seconds: float = settings.MAILGUN_TIMEOUT_SECONDS
-    ) -> None:
+    def __init__(self, timeout_seconds: float = settings.MAILGUN_TIMEOUT_SECONDS) -> None:
         self._timeout_seconds = timeout_seconds
 
     async def send(self, to: str, subject: str, html_body: str) -> None:
@@ -72,9 +70,7 @@ class MailgunEmailSender:
                 f"Mailgun transient error ({response.status_code}): {response.text}"
             )
         if response.status_code >= 400:
-            status_safe, response_text_safe = sanitize_log_args(
-                response.status_code, response.text
-            )
+            status_safe, response_text_safe = sanitize_log_args(response.status_code, response.text)
             logger.error(
                 "Mailgun rejected email with status %s: %s",
                 status_safe,

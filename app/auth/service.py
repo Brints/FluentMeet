@@ -72,9 +72,7 @@ class AuthService:
             user_id=db_user.id,
         )
 
-        verification_link = (
-            f"{frontend_base_url}/verify-email?token={verification_token.token}"
-        )
+        verification_link = f"{frontend_base_url}/verify-email?token={verification_token.token}"
 
         try:
             await self.email_producer.send_email(
@@ -117,9 +115,7 @@ class AuthService:
             )
 
         # Verify password
-        if not self.security_service.verify_password(
-            payload.password, user.hashed_password
-        ):
+        if not self.security_service.verify_password(payload.password, user.hashed_password):
             await self.lockout_svc.record_failed_attempt(email)
             raise UnauthorizedException(
                 code="INVALID_CREDENTIALS",
@@ -144,13 +140,9 @@ class AuthService:
         await self.lockout_svc.reset_attempts(email)
 
         # Issue tokens
-        access_token, expires_in = self.security_service.create_access_token(
-            email=email
-        )
-        refresh_token, refresh_jti, refresh_ttl = (
-            self.security_service.create_refresh_token(
-                email=email,
-            )
+        access_token, expires_in = self.security_service.create_access_token(email=email)
+        refresh_token, refresh_jti, refresh_ttl = self.security_service.create_refresh_token(
+            email=email,
         )
 
         # Persist refresh JTI in Redis
@@ -172,9 +164,7 @@ class AuthService:
         if not user:
             return
 
-        reset_link = (
-            f"{frontend_base_url}/reset-password?user={user.id}&token={uuid.uuid4()}"
-        )
+        reset_link = f"{frontend_base_url}/reset-password?user={user.id}&token={uuid.uuid4()}"
         try:
             await self.email_producer.send_email(
                 to=user.email,
@@ -191,9 +181,7 @@ class AuthService:
                 exc_safe,
             )
 
-    async def refresh_token(
-        self, raw_token: str
-    ) -> tuple[RefreshTokenResponse, str, int]:
+    async def refresh_token(self, raw_token: str) -> tuple[RefreshTokenResponse, str, int]:
         try:
             token_data = self.security_service.decode_refresh_token(raw_token)
         except ValueError as exc:
@@ -225,15 +213,11 @@ class AuthService:
 
         await self.token_store.revoke_refresh_token(email=email, jti=old_jti)
 
-        new_access_token, expires_in = self.security_service.create_access_token(
+        new_access_token, expires_in = self.security_service.create_access_token(email=email)
+        new_refresh_token, new_jti, new_ttl = self.security_service.create_refresh_token(
             email=email
         )
-        new_refresh_token, new_jti, new_ttl = (
-            self.security_service.create_refresh_token(email=email)
-        )
-        await self.token_store.save_refresh_token(
-            email=email, jti=new_jti, ttl_seconds=new_ttl
-        )
+        await self.token_store.save_refresh_token(email=email, jti=new_jti, ttl_seconds=new_ttl)
 
         body = RefreshTokenResponse(
             access_token=new_access_token,

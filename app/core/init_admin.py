@@ -13,9 +13,7 @@ logger = logging.getLogger(__name__)
 
 def init_admin(db: Session) -> None:
     if not settings.ADMIN_EMAIL or not settings.ADMIN_PASSWORD:
-        logger.info(
-            "Admin credentials not fully set in .env, skipping admin initialization."
-        )
+        logger.info("Admin credentials not fully set in .env, skipping admin initialization.")
         return
 
     admin_email = settings.ADMIN_EMAIL.lower()

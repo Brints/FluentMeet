@@ -66,9 +66,7 @@ def test_create_token_persists_token(db_session: Session) -> None:
     user_id = _create_user(db=db_session, email="crud-create@example.com")
 
     # Direct model creation instead of repository
-    token = VerificationToken(
-        user_id=user_id, expires_at=datetime.now(UTC) + timedelta(hours=24)
-    )
+    token = VerificationToken(user_id=user_id, expires_at=datetime.now(UTC) + timedelta(hours=24))
     db_session.add(token)
     db_session.commit()
     db_session.refresh(token)

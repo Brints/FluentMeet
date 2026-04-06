@@ -43,9 +43,7 @@ def extract_guest_session(request: Request) -> str | None:
     if auth and auth.startswith("Bearer "):
         token = auth.split(" ")[1]
         try:
-            payload = jwt.decode(
-                token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
-            )
+            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
             if payload.get("type") == "guest":
                 return payload.get("sub")  # type: ignore[no-any-return]
         except Exception as exc:
@@ -201,9 +199,7 @@ async def admit_user(
     current_user: User = Depends(get_current_user),
     service: MeetingService = Depends(get_meeting_service),
 ) -> JSONResponse:
-    await service.admit_user(
-        host=current_user, room_code=room_code, target_user_id=user_id
-    )
+    await service.admit_user(host=current_user, room_code=room_code, target_user_id=user_id)
     return JSONResponse(
         content={"status": "success", "message": MSG_USER_ADMITTED},
         status_code=status.HTTP_200_OK,
@@ -239,9 +235,7 @@ async def update_config(
     current_user: User = Depends(get_current_user),
     service: MeetingService = Depends(get_meeting_service),
 ) -> JSONResponse:
-    settings_data = service.update_config(
-        host=current_user, room_code=room_code, config=payload
-    )
+    settings_data = service.update_config(host=current_user, room_code=room_code, config=payload)
     return JSONResponse(
         content={
             "status": "success",

@@ -63,9 +63,7 @@ class MeetingStateService:
             "Awaitable[dict[Any, Any]]",
             self._redis.hgetall(key_room_participants(room_code)),
         )
-        return {
-            user_id: json.loads(state_str) for user_id, state_str in raw_data.items()
-        }
+        return {user_id: json.loads(state_str) for user_id, state_str in raw_data.items()}
 
     # ── Lobby Set ────────────────────────────────────────────────────────
 
@@ -84,9 +82,7 @@ class MeetingStateService:
 
     async def remove_from_lobby(self, room_code: str, user_id: str) -> None:
         """Remove a user from the lobby set (e.g. if rejected or left)."""
-        await cast(
-            "Awaitable[Any]", self._redis.hdel(key_room_lobby(room_code), user_id)
-        )
+        await cast("Awaitable[Any]", self._redis.hdel(key_room_lobby(room_code), user_id))
 
     async def get_lobby(self, room_code: str) -> dict[str, dict]:
         """Fetch all users currently in the lobby."""
@@ -118,18 +114,14 @@ class MeetingStateService:
             "language": language,
             "hardware_ready": True,
         }
-        pipe.hset(
-            name=key_room_participants(room_code), key=user_id, value=json.dumps(state)
-        )
+        pipe.hset(name=key_room_participants(room_code), key=user_id, value=json.dumps(state))
 
         await pipe.execute()
         return True
 
     # ── Active Speaker ───────────────────────────────────────────────────
 
-    async def set_active_speaker(
-        self, room_code: str, user_id: str, ttl_seconds: int = 5
-    ) -> None:
+    async def set_active_speaker(self, room_code: str, user_id: str, ttl_seconds: int = 5) -> None:
         """Update the current active speaker.
 
         TTL ensures the speaker resets if the client disconnects or stops sending
