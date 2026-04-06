@@ -70,7 +70,12 @@ def base_translation_event() -> TranslationEvent:
 async def test_stt_worker_handle(mock_producer, base_audio_chunk_event):
     worker = STTWorker(producer=mock_producer)
 
-    with patch("app.services.stt_worker.get_deepgram_stt_service") as mock_get_stt:
+    with (
+        patch("app.services.stt_worker.get_deepgram_stt_service") as mock_get_stt,
+        patch("app.core.config.settings") as mock_settings,
+    ):
+        mock_settings.DEEPGRAM_API_KEY = "fake-key"
+
         mock_stt_svc = AsyncMock()
         mock_stt_svc.transcribe.return_value = {
             "text": "Hello audio",
@@ -106,7 +111,12 @@ async def test_translation_worker_handle(mock_producer, base_transcription_event
         patch(
             "app.services.translation_worker.get_deepl_translation_service"
         ) as mock_get_deepl,
+        patch("app.services.translation_worker.get_openai_translation_fallback"),
+        patch("app.core.config.settings") as mock_settings,
     ):
+        mock_settings.DEEPL_API_KEY = "fake-deepl-key"
+        mock_settings.OPENAI_API_KEY = "fake-openai-key"
+
         mock_state = AsyncMock()
         # Two users with different languages (fr and es)
         mock_state.get_participants.return_value = {
