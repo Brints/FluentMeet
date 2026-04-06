@@ -22,6 +22,8 @@ class RoomStatus(enum.StrEnum):
 
 class ParticipantRole(enum.StrEnum):
     HOST = "host"
+    CO_HOST = "co_host"
+    PARTICIPANT = "participant"
     GUEST = "guest"
 
 

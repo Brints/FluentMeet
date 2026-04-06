@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import Boolean, DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.auth.constants import UserRole
 from app.models.base import Base
 
 
@@ -40,6 +41,14 @@ class User(Base):
     # Language preferences
     speaking_language: Mapped[str] = mapped_column(String(10), default="en")
     listening_language: Mapped[str] = mapped_column(String(10), default="en")
+
+    # Role
+    user_role: Mapped[str] = mapped_column(
+        String(50),
+        default=UserRole.USER.value,
+        server_default=UserRole.USER.value,
+        index=True,
+    )
 
 
 def default_expiry() -> datetime:

@@ -63,10 +63,10 @@ openai==2.26.0
 packaging==26.0
 passlib==1.7.4
 pathspec==1.0.4
-psycopg2-binary==2.9.11
 platformdirs==4.9.4
 pluggy==1.6.0
 propcache==0.4.1
+psycopg2-binary==2.9.11
 pyasn1==0.6.2
 pycparser==3.0
 pydantic==2.12.5
@@ -83,7 +83,7 @@ python-jose==3.5.0
 python-multipart==0.0.22
 pytokens==0.4.1
 PyYAML==6.0.3
-redis==7.3.0
+redis==7.4.0
 requests==2.32.5
 resend==2.23.0
 rich==14.3.3

@@ -38,7 +38,17 @@ class KafkaManager:
             bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS
         )
         self.consumers: list[BaseConsumer] = []
+
+        # Import locally to avoid circular dependencies
+        from app.services.stt_worker import STTWorker
+        from app.services.translation_worker import TranslationWorker
+        from app.services.tts_worker import TTSWorker
+
         self.register_consumer(EmailConsumerWorker(producer=self.producer))
+        self.register_consumer(STTWorker(producer=self.producer))
+        self.register_consumer(TranslationWorker(producer=self.producer))
+        self.register_consumer(TTSWorker(producer=self.producer))
+
         self._initialized = True
 
     def register_consumer(self, consumer: BaseConsumer) -> None:
@@ -52,9 +62,49 @@ class KafkaManager:
         topic_safe = sanitize_log_args(consumer.topic)[0]
         logger.info("Registered consumer for topic: '%s'", topic_safe)
 
+    async def _init_topics(self) -> None:
+        """Create required topics if they don't exist."""
+        from aiokafka.admin import AIOKafkaAdminClient, NewTopic  # type: ignore[import-untyped]
+
+        from app.kafka.topics import TOPICS_TO_CREATE
+
+        admin_client = AIOKafkaAdminClient(
+            bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS
+        )
+        await admin_client.start()
+        try:
+            # DLQ topics for each required topic + standard topics
+            new_topics = []
+            for topic in TOPICS_TO_CREATE:
+                new_topics.append(
+                    NewTopic(name=topic, num_partitions=1, replication_factor=1)
+                )
+                new_topics.append(
+                    NewTopic(
+                        name=f"dlq.{topic}", num_partitions=1, replication_factor=1
+                    )
+                )
+
+            # Check existing topics
+            existing_topics = await admin_client.list_topics()
+            topics_to_create_metadata = [
+                t for t in new_topics if t.name not in existing_topics
+            ]
+
+            if topics_to_create_metadata:
+                topic_names = [t.name for t in topics_to_create_metadata]
+                logger.info("Creating missing Kafka topics: %s", topic_names)
+                await admin_client.create_topics(topics_to_create_metadata)
+        except Exception as e:
+            error_safe = sanitize_log_args(e)[0]
+            logger.warning("Failed to auto-create Kafka topics: %s", error_safe)
+        finally:
+            await admin_client.close()
+
     async def start(self) -> None:
         """Start the producer, then all registered consumers."""
         logger.info("Starting Kafka Manager...")
+        await self._init_topics()
         await self.producer.start()
 
         for consumer in self.consumers:

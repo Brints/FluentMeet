@@ -17,3 +17,14 @@ TEXT_TRANSLATED: Final = "text.translated"
 
 # Dead-letter topics
 DLQ_PREFIX: Final = "dlq."
+
+# All standard topics that should be auto-created on startup
+TOPICS_TO_CREATE: Final = [
+    NOTIFICATIONS_EMAIL,
+    MEDIA_UPLOAD,
+    MEDIA_PROCESS_RECORDING,
+    AUDIO_RAW,
+    AUDIO_SYNTHESIZED,
+    TEXT_ORIGINAL,
+    TEXT_TRANSLATED,
+]

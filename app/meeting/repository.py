@@ -3,7 +3,7 @@
 import uuid
 from collections.abc import Sequence
 
-from sqlalchemy import Row, and_, func, or_, select
+from sqlalchemy import Row, and_, case, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.meeting.constants import ParticipantRole, RoomStatus
@@ -93,8 +93,18 @@ class MeetingRepository:
                 Room.name,
                 Room.created_at,
                 Room.ended_at,
-                func.round(
-                    func.extract("epoch", Room.ended_at - Room.created_at) / 60
+                case(
+                    (
+                        Room.ended_at.isnot(None),
+                        func.round(
+                            (
+                                func.julianday(Room.ended_at)
+                                - func.julianday(Room.created_at)
+                            )
+                            * 1440
+                        ),
+                    ),
+                    else_=None,
                 ).label("duration_minutes"),
                 func.count(Participant.id).label("participant_count"),
                 # Subquery to get the requesting user's role in this room
@@ -102,6 +112,7 @@ class MeetingRepository:
                 .where(
                     and_(Participant.room_id == Room.id, Participant.user_id == user_id)
                 )
+                .correlate(Room)
                 .scalar_subquery()
                 .label("role"),
             )

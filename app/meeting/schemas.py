@@ -46,7 +46,11 @@ class JoinRoomRequest(BaseModel):
         description="Required for guests. "
         "Authenticated users will use their account name.",
     )
-    listening_language: str = Field(default="en", description="Required for guests.")
+    listening_language: str | None = Field(
+        default=None,
+        description="Language for receiving translations. "
+        "Falls back to user profile language if not set.",
+    )
 
 
 # ── Response schemas ──────────────────────────────────────────────────
