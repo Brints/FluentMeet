@@ -1,17 +1,9 @@
 import uuid
 from datetime import datetime
-from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
-
-class SupportedLanguage(StrEnum):
-    ENGLISH = "en"
-    FRENCH = "fr"
-    GERMAN = "de"
-    SPANISH = "es"
-    ITALIAN = "it"
-    PORTUGUESE = "pt"
+from app.auth.constants import SupportedLanguage
 
 
 class UserBase(BaseModel):
@@ -51,6 +43,7 @@ class UserUpdate(BaseModel):
 
 class UserResponse(UserBase):
     id: uuid.UUID
+    user_role: str
     is_active: bool
     is_verified: bool
     created_at: datetime

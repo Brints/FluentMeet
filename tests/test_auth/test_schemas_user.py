@@ -15,6 +15,7 @@ def test_user_response_can_validate_from_attributes() -> None:
         listening_language="fr",
         is_active=True,
         is_verified=False,
+        user_role="user",
         created_at=datetime.now(UTC),
     )
 

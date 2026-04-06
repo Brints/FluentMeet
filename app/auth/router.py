@@ -176,8 +176,8 @@ async def forgot_password(
     )
     return ActionAcknowledgement(
         message=(
-            "If an account with that email exists, we have sent "
-            "password reset instructions."
+            "If an account with that email exists,"
+            " we have sent password reset instructions."
         )
     )
 

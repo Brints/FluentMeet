@@ -176,11 +176,19 @@ class MeetingService:
 
         is_host = bool(user and (room.host_id == user.id))
 
-        if room.scheduled_at and room.scheduled_at > utc_now() and not is_host:
-            raise BadRequestException(
-                code="MEETING_NOT_STARTED",
-                message="This meeting is scheduled for a future time.",
+        if room.scheduled_at:
+            # Normalize to naive UTC for comparison (SQLite strips tzinfo)
+            sched = (
+                room.scheduled_at.replace(tzinfo=None)
+                if room.scheduled_at.tzinfo
+                else room.scheduled_at
             )
+            now = utc_now().replace(tzinfo=None)
+            if sched > now and not is_host:
+                raise BadRequestException(
+                    code="MEETING_NOT_STARTED",
+                    message="This meeting is scheduled for a future time.",
+                )
 
         if room.status == RoomStatus.PENDING.value:
             if is_host:
@@ -248,6 +256,7 @@ class MeetingService:
         user: User | None,
         tracking_id: str,
         display_name: str,
+        listening_language: str | None,
         new_guest_token: str | None,
         live_pts: dict,
     ) -> dict | None:
@@ -258,8 +267,10 @@ class MeetingService:
         ):
             raise BadRequestException(
                 code="ROOM_FULL",
-                message=f"The room has reached its maximum capacity of {max_cap} "
-                f"participants.",
+                message=(
+                    f"The room has reached its maximum"
+                    f" capacity of {max_cap} participants."
+                ),
             )
 
         lock_room = room.settings.get("lock_room", False)
@@ -272,7 +283,15 @@ class MeetingService:
         if not requires_lobby:
             return None
 
-        await self.state.add_to_lobby(room_code, tracking_id, display_name)
+        # Priority: explicit join request > user profile > default "en"
+        if listening_language:
+            final_lang = listening_language
+        elif user and user.listening_language:
+            final_lang = user.listening_language
+        else:
+            final_lang = "en"
+
+        await self.state.add_to_lobby(room_code, tracking_id, display_name, final_lang)
         res: dict = {"status": "waiting"}
         if new_guest_token:
             res["guest_token"] = new_guest_token
@@ -287,7 +306,7 @@ class MeetingService:
         user: User | None,
         tracking_id: str,
         display_name: str,
-        listening_language: str,
+        listening_language: str | None,
         new_guest_token: str | None,
     ) -> dict:
         """Persist the participant record and add to Redis live state."""
@@ -304,7 +323,13 @@ class MeetingService:
             )
             self.repo.create_participant(ptc)
 
-        final_lang = user.listening_language if user else listening_language
+        # Priority: explicit join request > user profile > default "en"
+        if listening_language:
+            final_lang = listening_language
+        elif user and user.listening_language:
+            final_lang = user.listening_language
+        else:
+            final_lang = "en"
         await self.state.add_participant(
             room_code=room_code, user_id=tracking_id, language=final_lang
         )
@@ -322,7 +347,7 @@ class MeetingService:
         user: User | None = None,
         guest_session_id: str | None = None,
         guest_name: str | None = None,
-        listening_language: str = "en",
+        listening_language: str | None = None,
     ) -> dict:
         """Handle a user joining a room.
 
@@ -352,6 +377,7 @@ class MeetingService:
             user=user,
             tracking_id=tracking_id,
             display_name=display_name,
+            listening_language=listening_language,
             new_guest_token=new_guest_token,
             live_pts=live_pts,
         )
@@ -404,13 +430,7 @@ class MeetingService:
         if not room or room.host_id != host.id:
             raise ForbiddenException(message="Only the host can admit participants.")
 
-        # We need the user's language to build their Redis presence.
-        # But this method only takes strings. Wait, since it's an internal system call,
-        # we realistically just want to move them in Redis. They will broadcast their
-        # real language on WS connect. For now, default to en.
-        was_in_lobby = await self.state.admit_from_lobby(
-            room_code, target_user_id, language="en"
-        )
+        was_in_lobby = await self.state.admit_from_lobby(room_code, target_user_id)
 
         if not was_in_lobby:
             raise BadRequestException(message="User is not in the lobby.")

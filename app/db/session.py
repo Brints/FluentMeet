@@ -25,8 +25,8 @@ def _coerce_sync_url(url: str) -> str:
     if "+asyncpg" in url:
         fixed = url.replace("+asyncpg", "+psycopg2")
         logger.info(
-            "Replaced async driver 'asyncpg' with sync driver 'psycopg2' "
-            "in DATABASE_URL."
+            "Replaced async driver 'asyncpg' with sync"
+            " driver 'psycopg2' in DATABASE_URL."
         )
         return fixed
     return url

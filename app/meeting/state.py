@@ -70,11 +70,12 @@ class MeetingStateService:
     # ── Lobby Set ────────────────────────────────────────────────────────
 
     async def add_to_lobby(
-        self, room_code: str, user_id: str, display_name: str
+        self, room_code: str, user_id: str, display_name: str, language: str
     ) -> None:
         """Place a user in the waiting room/lobby hash."""
         state = {
             "display_name": display_name,
+            "language": language,
         }
         await cast(
             "Awaitable[Any]",
@@ -94,13 +95,20 @@ class MeetingStateService:
         )
         return {uid: json.loads(val) for uid, val in raw_data.items()}
 
-    async def admit_from_lobby(
-        self, room_code: str, user_id: str, language: str
-    ) -> bool:
+    async def admit_from_lobby(self, room_code: str, user_id: str) -> bool:
         """Atomically remove a user from the lobby and add them to participants.
 
         Returns True if the user was actually in the lobby.
         """
+        lobby_data_raw = await cast(
+            "Awaitable[Any]", self._redis.hget(key_room_lobby(room_code), user_id)
+        )
+        if not lobby_data_raw:
+            return False
+
+        lobby_state = json.loads(lobby_data_raw)
+        language = lobby_state.get("language", "en")
+
         # A lightweight transaction (pipeline) to ensure we don't have partial state
         pipe = self._redis.pipeline()
         pipe.hdel(key_room_lobby(room_code), user_id)
@@ -114,9 +122,8 @@ class MeetingStateService:
             name=key_room_participants(room_code), key=user_id, value=json.dumps(state)
         )
 
-        results = await pipe.execute()
-        # results[0] is the result of srem. 1 means removed, 0 means wasn't there.
-        return bool(results[0])
+        await pipe.execute()
+        return True
 
     # ── Active Speaker ───────────────────────────────────────────────────
 

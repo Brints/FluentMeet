@@ -147,8 +147,8 @@ def test_forgot_password_returns_generic_accepted_response(
     assert response.status_code == 202
     assert response.json() == {
         "message": (
-            "If an account with that email exists, we have sent "
-            "password reset instructions."
+            "If an account with that email exists,"
+            " we have sent password reset instructions."
         )
     }
     email_producer_mock.send_email.assert_not_awaited()

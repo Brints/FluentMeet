@@ -18,6 +18,10 @@ class Settings(BaseSettings):
     VERSION: str = get_version()
     API_V1_STR: str = "/api/v1"
 
+    # Default Admin
+    ADMIN_EMAIL: str | None = None
+    ADMIN_PASSWORD: str | None = None
+
     # Security
     SECRET_KEY: str = "placeholder_secret_key"
     ALGORITHM: str = "HS256"
@@ -54,6 +58,27 @@ class Settings(BaseSettings):
     VOICE_AI_API_KEY: str | None = None
     OPENAI_API_KEY: str | None = None
 
+    # AI Pipeline — STT (Deepgram)
+    DEEPGRAM_MODEL: str = "nova-2"
+    DEEPGRAM_API_URL: str = "https://api.deepgram.com/v1/listen"
+
+    # AI Pipeline — Translation (DeepL)
+    DEEPL_API_URL: str = "https://api-free.deepl.com/v2/translate"
+
+    # AI Pipeline — TTS (OpenAI)
+    OPENAI_TTS_MODEL: str = "tts-1"
+    OPENAI_TTS_VOICE: str = "alloy"
+    OPENAI_TTS_API_URL: str = "https://api.openai.com/v1/audio/speech"
+
+    # AI Pipeline — TTS (Voice.ai)
+    VOICEAI_TTS_MODEL: str = "voiceai-tts-multilingual-v1-latest"
+    VOICEAI_TTS_API_URL: str = "https://dev.voice.ai/api/v1/tts/speech"
+
+    # AI Pipeline — Audio Settings
+    PIPELINE_AUDIO_SAMPLE_RATE: int = 16000
+    PIPELINE_AUDIO_ENCODING: str = "linear16"  # "linear16" or "opus"
+    ACTIVE_TTS_PROVIDER: str = "openai"  # "openai" or "voiceai"
+
     # Mailgun Email Service
     MAILGUN_API_KEY: str | None = None
     MAILGUN_DOMAIN: str | None = None
@@ -66,6 +91,11 @@ class Settings(BaseSettings):
     CLOUDINARY_API_SECRET: str | None = None
     CLOUDINARY_MAX_IMAGE_SIZE_MB: int = 5
     CLOUDINARY_MAX_VIDEO_SIZE_MB: int = 100
+
+    # Room Management
+    ROOM_CODE: str | None = None
+    ACCESS_TOKEN: str | None = None
+    SYSTEM_PATH: str | None = None
 
     # URL used in transactional email links
     FRONTEND_BASE_URL: str = "http://localhost:3000"

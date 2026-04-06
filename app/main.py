@@ -9,8 +9,10 @@ from slowapi.errors import RateLimitExceeded
 
 from app.core.config import settings
 from app.core.exception_handlers import register_exception_handlers
+from app.core.init_admin import init_admin
 from app.core.rate_limiter import limiter, rate_limit_exception_handler
 from app.core.sanitize import sanitize_for_log
+from app.db.session import SessionLocal
 from app.kafka.manager import get_kafka_manager
 from app.routers import api_router
 
@@ -28,6 +30,14 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
     except Exception as exc:
         # Keep API startup alive in environments where Kafka isn't available (e.g. CI).
         logger.warning("Kafka startup skipped: %s", sanitize_for_log(exc))
+
+    # Initialize Admin
+    try:
+        with SessionLocal() as db_session:
+            init_admin(db_session)
+    except Exception as exc:
+        logger.warning("Admin initialization failed: %s", sanitize_for_log(exc))
+
     yield
     # Shutdown
     if kafka_started:

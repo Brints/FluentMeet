@@ -170,8 +170,8 @@ class StorageService:
             allowed = ", ".join(sorted(allowed_types))
             raise FileValidationError(
                 message=(
-                    f"File type '{content_type}' is not allowed. "
-                    f"Accepted types: {allowed}."
+                    f"File type '{content_type}' is not allowed."
+                    f" Accepted types: {allowed}."
                 ),
                 code="INVALID_FILE_TYPE",
             )

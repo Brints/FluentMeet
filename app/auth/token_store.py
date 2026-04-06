@@ -13,6 +13,7 @@ without maintaining a secondary index.
 import logging
 
 import redis.asyncio as aioredis
+from redis.asyncio import Redis
 
 from app.core.config import settings
 from app.core.sanitize import sanitize_for_log
@@ -22,7 +23,7 @@ logger = logging.getLogger(__name__)
 _REDIS_CLIENT: aioredis.Redis | None = None
 
 
-def _get_redis_client() -> aioredis.Redis:
+def _get_redis_client() -> Redis:
     """Return (and lazily create) a module-level async Redis client."""
     global _REDIS_CLIENT  # noqa: PLW0603
     if _REDIS_CLIENT is None:

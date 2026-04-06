@@ -48,7 +48,8 @@ def extract_guest_session(request: Request) -> str | None:
             )
             if payload.get("type") == "guest":
                 return payload.get("sub")  # type: ignore[no-any-return]
-        except Exception:
+        except Exception as exc:
+            logger.error(f"Extract guest session error: {exc}")
             pass
     return None
 
@@ -160,7 +161,7 @@ async def join_room(
         user=current_user,
         guest_session_id=guest_session_id,
         guest_name=payload.display_name if payload else None,
-        listening_language=payload.listening_language if payload else "en",
+        listening_language=payload.listening_language if payload else None,
     )
     return JSONResponse(
         content={"status": "success", "message": MSG_ROOM_JOINED, "data": result},

@@ -549,9 +549,7 @@ class TestAdmitUser:
 
         await svc.admit_user(host=host, room_code="ABCDEF123456", target_user_id="u99")
 
-        state.admit_from_lobby.assert_awaited_once_with(
-            "ABCDEF123456", "u99", language="en"
-        )
+        state.admit_from_lobby.assert_awaited_once_with("ABCDEF123456", "u99")
 
     @pytest.mark.anyio
     async def test_non_host_cannot_admit(self) -> None:
