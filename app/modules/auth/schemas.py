@@ -116,6 +116,20 @@ class ActionAcknowledgement(BaseModel):
     message: str
 
 
+class ResetPasswordRequest(BaseModel):
+    """Payload submitted to ``POST /auth/reset-password``."""
+
+    token: str = Field(..., min_length=1)
+    new_password: str = Field(..., min_length=8)
+
+
+class ChangePasswordRequest(BaseModel):
+    """Payload submitted to ``POST /auth/change-password``."""
+
+    current_password: str
+    new_password: str = Field(..., min_length=8)
+
+
 class RefreshTokenResponse(BaseModel):
     """Payload returned on successful token rotation.
 

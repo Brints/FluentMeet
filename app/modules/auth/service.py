@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.exceptions import (
+    BadRequestException,
     ConflictException,
     ForbiddenException,
     UnauthorizedException,
@@ -335,3 +336,164 @@ class AuthService:
         )
 
         return login_response, refresh_token, refresh_ttl
+
+    # ------------------------------------------------------------------
+    # Logout
+    # ------------------------------------------------------------------
+
+    async def logout(
+        self,
+        email: str,
+        access_jti: str,
+        access_ttl_remaining: int,
+        refresh_jti: str | None,
+    ) -> None:
+        """Invalidate the current session.
+
+        Blacklists the access-token JTI so that ``get_current_user``
+        rejects it on subsequent requests, and revokes the refresh-token
+        JTI (if provided) so it cannot be rotated again.
+        """
+        await self.token_store.blacklist_access_token(
+            jti=access_jti, ttl_seconds=access_ttl_remaining
+        )
+
+        if refresh_jti:
+            await self.token_store.revoke_refresh_token(email=email, jti=refresh_jti)
+
+    # ------------------------------------------------------------------
+    # Reset Password (unauthenticated — uses email token)
+    # ------------------------------------------------------------------
+
+    async def reset_password(self, token: str, new_password: str) -> None:
+        """Validate a password-reset token and apply the new password."""
+        reset_token = self.db.execute(
+            select(PasswordResetToken).where(PasswordResetToken.token == token)
+        ).scalar_one_or_none()
+
+        if reset_token is None:
+            raise BadRequestException(
+                code="INVALID_RESET_TOKEN",
+                message="Password reset token is invalid.",
+            )
+
+        if reset_token.expires_at.tzinfo is None:
+            expires_at = reset_token.expires_at.replace(tzinfo=UTC)
+        else:
+            expires_at = reset_token.expires_at
+
+        if expires_at < datetime.now(UTC):
+            raise BadRequestException(
+                code="RESET_TOKEN_EXPIRED",
+                message=("Password reset token has expired. Please request a new one."),
+            )
+
+        user = self.db.execute(
+            select(User).where(User.id == reset_token.user_id)
+        ).scalar_one_or_none()
+
+        if user is None:  # pragma: no cover — defensive
+            raise BadRequestException(
+                code="INVALID_RESET_TOKEN",
+                message="Password reset token is invalid.",
+            )
+
+        # Reject if new password matches the current one
+        if self.security_service.verify_password(new_password, user.hashed_password):
+            raise BadRequestException(
+                code="SAME_PASSWORD",
+                message="New password must be different from the current password.",
+            )
+
+        # Atomic DB update
+        user.hashed_password = self.security_service.hash_password(new_password)
+        user.updated_at = datetime.now(UTC)
+        self.db.delete(reset_token)
+        self.db.commit()
+
+        # Revoke all sessions — best-effort (password is already changed)
+        try:
+            await self.token_store.revoke_all_user_tokens(email=user.email)
+        except Exception as exc:
+            email_safe, exc_safe = sanitize_log_args(user.email, exc)
+            logger.warning(
+                "Failed to revoke sessions for %s after password reset: %s",
+                email_safe,
+                exc_safe,
+            )
+
+        # Send security notification email
+        try:
+            await self.email_producer.send_email(
+                to=user.email,
+                subject="Your FluentMeet password was reset",
+                html_body=None,
+                template_data={
+                    "full_name": user.full_name or "User",
+                },
+                template="password_changed",
+            )
+        except Exception as exc:
+            email_safe, exc_safe = sanitize_log_args(user.email, exc)
+            logger.warning(
+                "Failed to send password-reset confirmation for %s: %s",
+                email_safe,
+                exc_safe,
+            )
+
+    # ------------------------------------------------------------------
+    # Change Password (authenticated)
+    # ------------------------------------------------------------------
+
+    async def change_password(
+        self, user: User, current_password: str, new_password: str
+    ) -> None:
+        """Change the password for an authenticated user."""
+        if not self.security_service.verify_password(
+            current_password, user.hashed_password
+        ):
+            raise BadRequestException(
+                code="INCORRECT_PASSWORD",
+                message="Current password is incorrect.",
+            )
+
+        if current_password == new_password:
+            raise BadRequestException(
+                code="SAME_PASSWORD",
+                message="New password must be different from the current password.",
+            )
+
+        # Atomic DB update
+        user.hashed_password = self.security_service.hash_password(new_password)
+        user.updated_at = datetime.now(UTC)
+        self.db.commit()
+
+        # Revoke all refresh tokens — best-effort
+        try:
+            await self.token_store.revoke_all_user_tokens(email=user.email)
+        except Exception as exc:
+            email_safe, exc_safe = sanitize_log_args(user.email, exc)
+            logger.warning(
+                "Failed to revoke sessions for %s after password change: %s",
+                email_safe,
+                exc_safe,
+            )
+
+        # Send security notification email
+        try:
+            await self.email_producer.send_email(
+                to=user.email,
+                subject="Your FluentMeet password was changed",
+                html_body=None,
+                template_data={
+                    "full_name": user.full_name or "User",
+                },
+                template="password_changed",
+            )
+        except Exception as exc:
+            email_safe, exc_safe = sanitize_log_args(user.email, exc)
+            logger.warning(
+                "Failed to send password-change confirmation for %s: %s",
+                email_safe,
+                exc_safe,
+            )
