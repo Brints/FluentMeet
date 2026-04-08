@@ -86,3 +86,33 @@ class VerificationToken(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utc_now
     )
+
+
+class PasswordResetToken(Base):
+    """Model representing a password reset token.
+
+    Attributes:
+        id (int): Primary key identifier for the token.
+        user_id (uuid.UUID): Foreign key referencing the associated user.
+        token (str): Unique token string used for password reset.
+        expires_at (datetime): Timestamp indicating when the token expires.
+        created_at (datetime): Timestamp indicating when the token was created.
+    """
+
+    __tablename__ = "password_reset_tokens"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("users.id"), nullable=False)
+    token: Mapped[str] = mapped_column(
+        String(36),
+        unique=True,
+        index=True,
+        nullable=False,
+        default=lambda: str(uuid.uuid4()),
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
