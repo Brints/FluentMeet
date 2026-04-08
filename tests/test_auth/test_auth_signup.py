@@ -7,10 +7,10 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.modules.auth.models import User
 from app.db.session import get_db
 from app.main import app
 from app.models.base import Base
+from app.modules.auth.models import User
 from app.services.email_producer import get_email_producer_service
 
 

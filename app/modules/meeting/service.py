@@ -9,7 +9,6 @@ from typing import Any
 from jose import jwt
 from sqlalchemy.orm import Mapped
 
-from app.modules.auth.models import User
 from app.core.config import settings
 from app.core.exceptions import (
     BadRequestException,
@@ -17,6 +16,7 @@ from app.core.exceptions import (
     InternalServerException,
     NotFoundException,
 )
+from app.modules.auth.models import User
 from app.modules.meeting.constants import (
     MAX_ROOM_CODE_RETRIES,
     ROOM_CODE_BYTE_LENGTH,

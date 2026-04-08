@@ -9,8 +9,8 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.modules.auth.models import User, VerificationToken
 from app.models.base import Base
+from app.modules.auth.models import User, VerificationToken
 from app.modules.user.service import UserService
 
 # ── Fixtures ──────────────────────────────────────────────────────────

@@ -6,9 +6,9 @@ from fastapi import APIRouter, Depends, Query, Request, status
 from fastapi.responses import JSONResponse
 from jose import jwt
 
-from app.modules.auth.models import User
 from app.core.config import settings
 from app.core.dependencies import get_current_user, get_current_user_optional
+from app.modules.auth.models import User
 from app.modules.meeting.constants import (
     MSG_INVITATIONS_SENT,
     MSG_MEETING_ENDED,

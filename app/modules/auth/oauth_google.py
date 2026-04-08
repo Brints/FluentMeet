@@ -1,4 +1,5 @@
 import urllib.parse
+from typing import Any, cast
 
 import httpx
 
@@ -45,20 +46,20 @@ class GoogleOAuthService:
             try:
                 response = await client.post(self.token_url, data=data)
                 response.raise_for_status()
-                return response.json()["access_token"]
-            except httpx.HTTPError:
+                return cast(str, response.json()["access_token"])
+            except httpx.HTTPError as err:
                 raise OAuthProviderException(
                     "Failed to exchange authorization code with Google."
-                )
+                ) from err
 
-    async def get_user_info(self, access_token: str) -> dict:
+    async def get_user_info(self, access_token: str) -> dict[str, Any]:
         headers = {"Authorization": f"Bearer {access_token}"}
         async with httpx.AsyncClient() as client:
             try:
                 response = await client.get(self.userinfo_url, headers=headers)
                 response.raise_for_status()
-                return response.json()
-            except httpx.HTTPError:
+                return cast(dict[str, Any], response.json())
+            except httpx.HTTPError as err:
                 raise OAuthProviderException(
                     "Failed to fetch user profile from Google."
-                )
+                ) from err

@@ -4,6 +4,13 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.exceptions import (
+    ConflictException,
+    ForbiddenException,
+    UnauthorizedException,
+)
+from app.core.sanitize import sanitize_log_args
+from app.core.security import SecurityService
 from app.modules.auth.account_lockout import AccountLockoutService
 from app.modules.auth.models import User
 from app.modules.auth.schemas import (
@@ -14,13 +21,6 @@ from app.modules.auth.schemas import (
 )
 from app.modules.auth.token_store import TokenStoreService
 from app.modules.auth.verification import AuthVerificationService
-from app.core.exceptions import (
-    ConflictException,
-    ForbiddenException,
-    UnauthorizedException,
-)
-from app.core.sanitize import sanitize_log_args
-from app.core.security import SecurityService
 from app.services.email_producer import EmailProducerService
 
 logger = logging.getLogger(__name__)

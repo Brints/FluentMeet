@@ -10,9 +10,9 @@ from jose import JWTError, jwt
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.modules.auth.models import User
 from app.core.config import settings
 from app.db.session import get_db
+from app.modules.auth.models import User
 from app.modules.meeting.state import MeetingStateService
 
 

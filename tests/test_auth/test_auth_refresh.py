@@ -10,17 +10,17 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.core.rate_limiter import limiter
+from app.core.security import SecurityService
+from app.db.session import get_db
+from app.main import app
+from app.models.base import Base
 from app.modules.auth.account_lockout import (
     AccountLockoutService,
     get_account_lockout_service,
 )
 from app.modules.auth.models import User
 from app.modules.auth.token_store import TokenStoreService, get_token_store_service
-from app.core.rate_limiter import limiter
-from app.core.security import SecurityService
-from app.db.session import get_db
-from app.main import app
-from app.models.base import Base
 from app.services.email_producer import get_email_producer_service
 
 # ---------------------------------------------------------------------------

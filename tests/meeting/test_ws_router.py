@@ -40,7 +40,9 @@ def mock_connection_manager():
 
 @pytest.fixture
 def mock_audio_ingest():
-    with patch("app.modules.meeting.ws_router.get_audio_ingest_service") as mock_get_ingest:
+    with patch(
+        "app.modules.meeting.ws_router.get_audio_ingest_service"
+    ) as mock_get_ingest:
         ingest = MagicMock()
         ingest.reset_sequence = MagicMock()
         ingest.publish_audio_chunk = AsyncMock()

@@ -3,6 +3,9 @@ import logging
 from fastapi import APIRouter, Depends, Query, Request, status
 from fastapi.responses import JSONResponse, RedirectResponse
 
+from app.core.config import settings
+from app.core.rate_limiter import limiter
+from app.core.sanitize import sanitize_log_args
 from app.modules.auth.dependencies import (
     get_auth_service,
     get_auth_verification_service,
@@ -22,9 +25,6 @@ from app.modules.auth.schemas import (
 )
 from app.modules.auth.service import AuthService
 from app.modules.auth.verification import AuthVerificationService
-from app.core.config import settings
-from app.core.rate_limiter import limiter
-from app.core.sanitize import sanitize_log_args
 
 logger = logging.getLogger(__name__)
 
@@ -243,6 +243,7 @@ async def google_login(
     google_oauth: GoogleOAuthService = Depends(get_google_oauth_service),
 ) -> RedirectResponse:
     import secrets
+
     from app.modules.auth.token_store import _get_redis_client
 
     state = secrets.token_urlsafe(32)
@@ -263,8 +264,8 @@ async def google_callback(
     google_oauth: GoogleOAuthService = Depends(get_google_oauth_service),
     auth_service: AuthService = Depends(get_auth_service),
 ) -> RedirectResponse:
-    from app.modules.auth.token_store import _get_redis_client
     from app.core.exceptions import BadRequestException
+    from app.modules.auth.token_store import _get_redis_client
 
     redis = _get_redis_client()
     state_key = f"oauth_state:{state}"
@@ -303,7 +304,9 @@ async def google_callback(
 
     # 4. Return tokens (Cookie & Redirect with access token)
     # Using URL fragment as requested by the user
-    redirect_url = f"{settings.FRONTEND_BASE_URL}#access_token={login_response.access_token}"
+    redirect_url = (
+        f"{settings.FRONTEND_BASE_URL}#access_token={login_response.access_token}"
+    )
     response = RedirectResponse(url=redirect_url, status_code=302)
 
     # Set HttpOnly refresh-token cookie

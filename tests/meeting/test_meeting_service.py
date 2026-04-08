@@ -10,16 +10,16 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.modules.auth.models import User
 from app.core.exceptions import (
     BadRequestException,
     ForbiddenException,
     InternalServerException,
     NotFoundException,
 )
+from app.modules.auth.models import User
 from app.modules.meeting.constants import ParticipantRole, RoomStatus
 from app.modules.meeting.models import Participant, Room
-from app.modules.meeting.service import utc_now, MeetingService, _format_duration
+from app.modules.meeting.service import MeetingService, _format_duration, utc_now
 
 # ---------------------------------------------------------------------------
 # Helpers

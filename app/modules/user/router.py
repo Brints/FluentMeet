@@ -5,8 +5,6 @@ import logging
 from fastapi import APIRouter, Depends, File, Query, Request, UploadFile, status
 from fastapi.responses import JSONResponse
 
-from app.modules.auth.models import User
-from app.modules.auth.token_store import TokenStoreService, get_token_store_service
 from app.core.config import settings
 from app.core.dependencies import get_current_user
 from app.external_services.cloudinary.constants import RESOURCE_TYPE_IMAGE
@@ -14,6 +12,8 @@ from app.external_services.cloudinary.service import (
     StorageService,
     get_storage_service,
 )
+from app.modules.auth.models import User
+from app.modules.auth.token_store import TokenStoreService, get_token_store_service
 from app.modules.user.constants import (
     AVATAR_FOLDER,
     MSG_ACCOUNT_DELETED,

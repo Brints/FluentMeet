@@ -1,14 +1,16 @@
 from fastapi import Depends
 from sqlalchemy.orm import Session
 
+from app.core.security import SecurityService, get_security_service
+from app.db.session import get_db
+from app.modules.auth.account_lockout import (
+    AccountLockoutService,
+    get_account_lockout_service,
+)
 from app.modules.auth.oauth_google import GoogleOAuthService
-
-from app.modules.auth.account_lockout import AccountLockoutService, get_account_lockout_service
 from app.modules.auth.service import AuthService
 from app.modules.auth.token_store import TokenStoreService, get_token_store_service
 from app.modules.auth.verification import AuthVerificationService
-from app.core.security import SecurityService, get_security_service
-from app.db.session import get_db
 from app.services.email_producer import EmailProducerService, get_email_producer_service
 
 
