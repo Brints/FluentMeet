@@ -3,8 +3,8 @@ import logging
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.auth.constants import UserRole
-from app.auth.models import User
+from app.modules.auth.constants import UserRole
+from app.modules.auth.models import User
 from app.core.config import settings
 from app.core.security import security_service
 

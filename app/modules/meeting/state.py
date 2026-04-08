@@ -7,8 +7,8 @@ from typing import Any, cast
 
 import redis.asyncio as aioredis
 
-from app.auth.token_store import _get_redis_client
-from app.meeting.constants import (
+from app.modules.auth.token_store import _get_redis_client
+from app.modules.meeting.constants import (
     key_room_active_speaker,
     key_room_lobby,
     key_room_participants,

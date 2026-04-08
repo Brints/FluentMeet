@@ -4,7 +4,7 @@ from fastapi import Depends
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.user.service import UserService
+from app.modules.user.service import UserService
 
 
 def get_user_service(

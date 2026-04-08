@@ -8,7 +8,7 @@ import bcrypt
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
-from app.auth.schemas import RefreshTokenClaims
+from app.modules.auth.schemas import RefreshTokenClaims
 from app.core.config import settings
 
 # Workaround for unmaintained passlib 1.7.4.

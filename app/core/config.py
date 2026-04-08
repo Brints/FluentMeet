@@ -58,6 +58,11 @@ class Settings(BaseSettings):
     VOICE_AI_API_KEY: str | None = None
     OPENAI_API_KEY: str | None = None
 
+    # Google OAuth
+    GOOGLE_CLIENT_ID: str | None = None
+    GOOGLE_CLIENT_SECRET: str | None = None
+    GOOGLE_REDIRECT_URI: str | None = None
+
     # AI Pipeline — STT (Deepgram)
     DEEPGRAM_MODEL: str = "nova-2"
     DEEPGRAM_API_URL: str = "https://api.deepgram.com/v1/listen"

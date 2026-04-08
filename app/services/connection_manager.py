@@ -142,7 +142,7 @@ class ConnectionManager:
 
 # ── Module-level Dependency ───────────────────────────────────────────
 
-from app.auth.token_store import _get_redis_client  # noqa: E402
+from app.modules.auth.token_store import _get_redis_client  # noqa: E402
 
 # We keep a singleton reference for the application lifecycle
 _connection_manager: ConnectionManager | None = None

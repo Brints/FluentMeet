@@ -5,7 +5,7 @@ from typing import Any
 from sqlalchemy import JSON, DateTime, ForeignKey, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.meeting.constants import DEFAULT_ROOM_SETTINGS
+from app.modules.meeting.constants import DEFAULT_ROOM_SETTINGS
 from app.models.base import Base
 
 

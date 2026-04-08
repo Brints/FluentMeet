@@ -4,7 +4,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import Boolean, DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.auth.constants import UserRole
+from app.modules.auth.constants import UserRole
 from app.models.base import Base
 
 
@@ -37,6 +37,9 @@ class User(Base):
 
     # Profile
     avatar_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    google_id: Mapped[str | None] = mapped_column(
+        String(255), unique=True, index=True, nullable=True
+    )
 
     # Language preferences
     speaking_language: Mapped[str] = mapped_column(String(10), default="en")

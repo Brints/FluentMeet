@@ -10,12 +10,12 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.auth.account_lockout import (
+from app.modules.auth.account_lockout import (
     AccountLockoutService,
     get_account_lockout_service,
 )
-from app.auth.models import User
-from app.auth.token_store import (
+from app.modules.auth.models import User
+from app.modules.auth.token_store import (
     TokenStoreService,
     get_token_store_service,
 )

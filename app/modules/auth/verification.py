@@ -5,7 +5,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.auth.models import User, VerificationToken
+from app.modules.auth.models import User, VerificationToken
 from app.core.config import settings
 from app.core.exceptions import BadRequestException
 from app.services.email_producer import EmailProducerService

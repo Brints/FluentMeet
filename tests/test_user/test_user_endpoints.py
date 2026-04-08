@@ -15,8 +15,8 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from app.auth.models import User
-from app.auth.token_store import TokenStoreService, get_token_store_service
+from app.modules.auth.models import User
+from app.modules.auth.token_store import TokenStoreService, get_token_store_service
 from app.core.dependencies import get_current_user
 from app.db.session import get_db
 from app.external_services.cloudinary.service import (

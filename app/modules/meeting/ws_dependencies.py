@@ -10,10 +10,10 @@ from jose import JWTError, jwt
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.auth.models import User
+from app.modules.auth.models import User
 from app.core.config import settings
 from app.db.session import get_db
-from app.meeting.state import MeetingStateService
+from app.modules.meeting.state import MeetingStateService
 
 
 def authenticate_ws(token: str = Query(...), db: Session = Depends(get_db)) -> str:

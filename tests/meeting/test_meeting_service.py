@@ -10,16 +10,16 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.auth.models import User
+from app.modules.auth.models import User
 from app.core.exceptions import (
     BadRequestException,
     ForbiddenException,
     InternalServerException,
     NotFoundException,
 )
-from app.meeting.constants import ParticipantRole, RoomStatus
-from app.meeting.models import Participant, Room
-from app.meeting.service import MeetingService, _format_duration, utc_now
+from app.modules.meeting.constants import ParticipantRole, RoomStatus
+from app.modules.meeting.models import Participant, Room
+from app.modules.meeting.service import utc_now, MeetingService, _format_duration
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -738,7 +738,7 @@ class TestInviteParticipants:
         mock_email_svc.send_email = AsyncMock()
 
         with patch(
-            "app.meeting.service.get_email_producer_service",
+            "app.modules.meeting.service.get_email_producer_service",
             return_value=mock_email_svc,
         ):
             result = await svc.invite_participants(
@@ -789,7 +789,7 @@ class TestInviteParticipants:
         mock_email_svc.send_email = AsyncMock(side_effect=Exception("Kafka down"))
 
         with patch(
-            "app.meeting.service.get_email_producer_service",
+            "app.modules.meeting.service.get_email_producer_service",
             return_value=mock_email_svc,
         ):
             result = await svc.invite_participants(

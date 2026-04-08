@@ -5,7 +5,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.auth.schemas import SupportedLanguage
+from app.modules.auth.schemas import SupportedLanguage
 
 # ── Request schemas ───────────────────────────────────────────────────
 

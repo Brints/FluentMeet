@@ -6,8 +6,8 @@ from collections.abc import Sequence
 from sqlalchemy import Row, and_, case, func, or_, select
 from sqlalchemy.orm import Session
 
-from app.meeting.constants import ParticipantRole, RoomStatus
-from app.meeting.models import MeetingInvitation, Participant, Room
+from app.modules.meeting.constants import ParticipantRole, RoomStatus
+from app.modules.meeting.models import MeetingInvitation, Participant, Room
 
 
 class MeetingRepository:
