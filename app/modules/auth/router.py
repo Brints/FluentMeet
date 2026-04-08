@@ -1,10 +1,12 @@
 import logging
+from datetime import UTC, datetime
 from typing import cast
 
-from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi import APIRouter, Depends, Query, Request, Response, status
 from fastapi.responses import JSONResponse, RedirectResponse
 
 from app.core.config import settings
+from app.core.dependencies import get_current_user
 from app.core.rate_limiter import limiter
 from app.core.sanitize import sanitize_log_args
 from app.modules.auth.dependencies import (
@@ -12,14 +14,17 @@ from app.modules.auth.dependencies import (
     get_auth_verification_service,
     get_google_oauth_service,
 )
+from app.modules.auth.models import User
 from app.modules.auth.oauth_google import GoogleOAuthService
 from app.modules.auth.schemas import (
     ActionAcknowledgement,
+    ChangePasswordRequest,
     ForgotPasswordRequest,
     LoginRequest,
     LoginResponse,
     RefreshTokenResponse,
     ResendVerificationRequest,
+    ResetPasswordRequest,
     SignupRequest,
     SignupResponse,
     VerifyEmailResponse,
@@ -185,6 +190,141 @@ async def forgot_password(
     )
     return ActionAcknowledgement(
         message="If an account with this email exists, a password reset link has been sent.",  # noqa: E501
+    )
+
+
+@router.post(
+    "/reset-password",
+    response_model=ActionAcknowledgement,
+    status_code=status.HTTP_200_OK,
+    summary="Reset password using an email token",
+    description=(
+        "Validates a one-time reset token (from the forgot-password email), "
+        "updates the user's password, deletes the token, and revokes all "
+        "active sessions."
+    ),
+    responses={
+        400: {"description": "Invalid or expired reset token, or same password."},
+    },
+)
+@limiter.limit("5/minute")
+async def reset_password(
+    request: Request,
+    payload: ResetPasswordRequest,
+    auth_service: AuthService = Depends(get_auth_service),
+) -> ActionAcknowledgement:
+    del request  # consumed by slowapi
+    await auth_service.reset_password(
+        token=payload.token,
+        new_password=payload.new_password,
+    )
+    return ActionAcknowledgement(
+        message=(
+            "Password has been reset successfully. Please log in with your new password."  # noqa: E501
+        ),
+    )
+
+
+@router.post(
+    "/change-password",
+    response_model=ActionAcknowledgement,
+    status_code=status.HTTP_200_OK,
+    summary="Change password for the authenticated user",
+    description=(
+        "Verifies the current password, updates the hash, and revokes all "
+        "active refresh tokens to force re-login on other devices."
+    ),
+    responses={
+        400: {
+            "description": (
+                "Current password incorrect, or new password same as current."
+            ),
+        },
+        401: {"description": "Not authenticated."},
+    },
+)
+@limiter.limit("10/minute")
+async def change_password(
+    request: Request,
+    payload: ChangePasswordRequest,
+    current_user: User = Depends(get_current_user),
+    auth_service: AuthService = Depends(get_auth_service),
+) -> ActionAcknowledgement:
+    del request  # consumed by slowapi
+    await auth_service.change_password(
+        user=current_user,
+        current_password=payload.current_password,
+        new_password=payload.new_password,
+    )
+    return ActionAcknowledgement(
+        message="Password updated successfully.",
+    )
+
+
+@router.post(
+    "/logout",
+    response_model=ActionAcknowledgement,
+    status_code=status.HTTP_200_OK,
+    summary="Log out the current session",
+    description=(
+        "Blacklists the current access token and revokes the refresh token, "
+        "effectively terminating the session immediately."
+    ),
+    responses={
+        401: {"description": "Not authenticated."},
+    },
+)
+@limiter.limit("20/minute")
+async def logout(
+    request: Request,
+    response: Response,
+    current_user: User = Depends(get_current_user),
+    auth_service: AuthService = Depends(get_auth_service),
+) -> ActionAcknowledgement:
+    from jose import jwt as jose_jwt
+
+    # --- Extract AT jti and remaining TTL from raw token -----------------
+    auth_header = request.headers.get("authorization", "")
+    raw_token = auth_header.removeprefix("Bearer ").strip()
+
+    payload_data = jose_jwt.decode(
+        raw_token,
+        settings.SECRET_KEY,
+        algorithms=[settings.ALGORITHM],
+    )
+    access_jti: str = payload_data["jti"]
+    access_exp: int = payload_data["exp"]
+    ttl_remaining = max(access_exp - int(datetime.now(UTC).timestamp()), 0)
+
+    # --- Extract RT jti from cookie (optional) ---------------------------
+    refresh_jti: str | None = None
+    raw_rt = request.cookies.get("refresh_token")
+    if raw_rt:
+        try:
+            rt_claims = jose_jwt.decode(
+                raw_rt,
+                settings.SECRET_KEY,
+                algorithms=[settings.ALGORITHM],
+            )
+            refresh_jti = rt_claims.get("jti")
+        except Exception:
+            pass  # expired / malformed — ignore
+
+    await auth_service.logout(
+        email=current_user.email,
+        access_jti=access_jti,
+        access_ttl_remaining=ttl_remaining,
+        refresh_jti=refresh_jti,
+    )
+
+    # Clear the HttpOnly refresh-token cookie
+    response.delete_cookie(
+        key="refresh_token",
+        path=f"{settings.API_V1_STR}/auth",
+    )
+
+    return ActionAcknowledgement(
+        message="Successfully logged out.",
     )
 
 
