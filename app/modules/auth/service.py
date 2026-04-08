@@ -4,16 +4,6 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.auth.account_lockout import AccountLockoutService
-from app.auth.models import User
-from app.auth.schemas import (
-    LoginRequest,
-    LoginResponse,
-    RefreshTokenResponse,
-    SignupRequest,
-)
-from app.auth.token_store import TokenStoreService
-from app.auth.verification import AuthVerificationService
 from app.core.exceptions import (
     ConflictException,
     ForbiddenException,
@@ -21,6 +11,16 @@ from app.core.exceptions import (
 )
 from app.core.sanitize import sanitize_log_args
 from app.core.security import SecurityService
+from app.modules.auth.account_lockout import AccountLockoutService
+from app.modules.auth.models import User
+from app.modules.auth.schemas import (
+    LoginRequest,
+    LoginResponse,
+    RefreshTokenResponse,
+    SignupRequest,
+)
+from app.modules.auth.token_store import TokenStoreService
+from app.modules.auth.verification import AuthVerificationService
 from app.services.email_producer import EmailProducerService
 
 logger = logging.getLogger(__name__)
@@ -242,3 +242,71 @@ class AuthService:
         )
 
         return body, new_refresh_token, new_ttl
+
+    async def resolve_oauth_user(
+        self, email: str, google_id: str, name: str | None, avatar_url: str | None
+    ) -> tuple[LoginResponse, str, int]:
+        email = email.lower()
+        user = self.get_user_by_email(email)
+
+        if user:
+            # Check lockout
+            if await self.lockout_svc.is_locked(email):
+                raise ForbiddenException(
+                    code="ACCOUNT_LOCKED",
+                    message="Account is temporarily locked. Please try again later.",
+                )
+
+            # Verify if user is active
+            if user.deleted_at is not None or not user.is_active:
+                raise ForbiddenException(
+                    code="ACCOUNT_DEACTIVATED",
+                    message="This account has been deactivated or deleted.",
+                )
+
+            # Link account if not linked
+            if not user.google_id:
+                user.google_id = google_id
+            if not user.avatar_url and avatar_url:
+                user.avatar_url = avatar_url
+            if not user.is_verified:
+                user.is_verified = True
+
+            self.db.commit()
+            self.db.refresh(user)
+        else:
+            # Create new user
+            random_password = str(uuid.uuid4())
+            user = User(
+                email=email,
+                hashed_password=self.security_service.hash_password(random_password),
+                full_name=name,
+                avatar_url=avatar_url,
+                google_id=google_id,
+                is_active=True,
+                is_verified=True,
+            )
+            self.db.add(user)
+            self.db.commit()
+            self.db.refresh(user)
+
+        # Issue tokens for successful OAuth login
+        access_token, expires_in = self.security_service.create_access_token(
+            email=email
+        )
+        refresh_token, refresh_jti, refresh_ttl = (
+            self.security_service.create_refresh_token(email=email)
+        )
+
+        await self.token_store.save_refresh_token(
+            email=email, jti=refresh_jti, ttl_seconds=refresh_ttl
+        )
+
+        login_response = LoginResponse(
+            access_token=access_token,
+            user_id=user.id,
+            token_type="bearer",
+            expires_in=expires_in,
+        )
+
+        return login_response, refresh_token, refresh_ttl

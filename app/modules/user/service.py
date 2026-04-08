@@ -11,8 +11,8 @@ from datetime import UTC, datetime
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from app.auth.models import User, VerificationToken
 from app.core.sanitize import sanitize_for_log
+from app.modules.auth.models import User, VerificationToken
 
 logger = logging.getLogger(__name__)
 

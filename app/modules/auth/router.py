@@ -1,10 +1,18 @@
 import logging
 
 from fastapi import APIRouter, Depends, Query, Request, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 
-from app.auth.dependencies import get_auth_service, get_auth_verification_service
-from app.auth.schemas import (
+from app.core.config import settings
+from app.core.rate_limiter import limiter
+from app.core.sanitize import sanitize_log_args
+from app.modules.auth.dependencies import (
+    get_auth_service,
+    get_auth_verification_service,
+    get_google_oauth_service,
+)
+from app.modules.auth.oauth_google import GoogleOAuthService
+from app.modules.auth.schemas import (
     ActionAcknowledgement,
     ForgotPasswordRequest,
     LoginRequest,
@@ -15,11 +23,8 @@ from app.auth.schemas import (
     SignupResponse,
     VerifyEmailResponse,
 )
-from app.auth.service import AuthService
-from app.auth.verification import AuthVerificationService
-from app.core.config import settings
-from app.core.rate_limiter import limiter
-from app.core.sanitize import sanitize_log_args
+from app.modules.auth.service import AuthService
+from app.modules.auth.verification import AuthVerificationService
 
 logger = logging.getLogger(__name__)
 
@@ -226,4 +231,93 @@ async def refresh_token(
         path=f"{settings.API_V1_STR}/auth",
         max_age=new_ttl,
     )
+    return response
+
+
+@router.get(
+    "/google/login",
+    summary="Initiate Google OAuth 2.0 login flow",
+    status_code=status.HTTP_302_FOUND,
+)
+async def google_login(
+    google_oauth: GoogleOAuthService = Depends(get_google_oauth_service),
+) -> RedirectResponse:
+    import secrets
+
+    from app.modules.auth.token_store import _get_redis_client
+
+    state = secrets.token_urlsafe(32)
+    redis = _get_redis_client()
+    await redis.set(f"oauth_state:{state}", "1", ex=600)  # 10 minutes TTL
+
+    url = google_oauth.build_auth_url(state=state)
+    return RedirectResponse(url=url, status_code=302)
+
+
+@router.get(
+    "/google/callback",
+    summary="Google OAuth 2.0 callback endpoint",
+)
+async def google_callback(
+    code: str,
+    state: str,
+    google_oauth: GoogleOAuthService = Depends(get_google_oauth_service),
+    auth_service: AuthService = Depends(get_auth_service),
+) -> RedirectResponse:
+    from app.core.exceptions import BadRequestException
+    from app.modules.auth.token_store import _get_redis_client
+
+    redis = _get_redis_client()
+    state_key = f"oauth_state:{state}"
+
+    # 1. State Validation
+    if not await redis.exists(state_key):
+        raise BadRequestException(
+            code="INVALID_OAUTH_STATE",
+            message="OAuth state is invalid or has expired.",
+        )
+
+    await redis.delete(state_key)
+
+    # 2. Exchange Code & Get Profile
+    access_token = await google_oauth.exchange_code(code=code)
+    user_info = await google_oauth.get_user_info(access_token=access_token)
+
+    email = user_info.get("email")
+    if not email:
+        raise BadRequestException(
+            code="INVALID_OAUTH_PROFILE",
+            message="Google account does not provide an email address.",
+        )
+
+    google_id = str(user_info.get("sub", ""))
+    name = user_info.get("name")
+    avatar = user_info.get("picture")
+
+    # 3. Resolve user
+    login_response, refresh_token, refresh_ttl = await auth_service.resolve_oauth_user(
+        email=email,
+        google_id=google_id,
+        name=name,
+        avatar_url=avatar,
+    )
+
+    # 4. Return tokens (Cookie & Redirect with access token)
+    # Using URL fragment as requested by the user
+    redirect_url = (
+        f"{settings.FRONTEND_BASE_URL}#access_token={login_response.access_token}"
+    )
+    response = RedirectResponse(url=redirect_url, status_code=302)
+
+    # Set HttpOnly refresh-token cookie
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,
+        secure=True,
+        samesite="strict",
+        path=f"{settings.API_V1_STR}/auth",
+        max_age=refresh_ttl,
+    )
+
     return response

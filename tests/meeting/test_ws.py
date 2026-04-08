@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from fastapi import WebSocket, WebSocketException, status
 
-from app.meeting.ws_dependencies import assert_room_participant, authenticate_ws
+from app.modules.meeting.ws_dependencies import assert_room_participant, authenticate_ws
 from app.services.connection_manager import ConnectionManager
 
 
@@ -79,7 +79,7 @@ async def test_connection_manager_unicast(connection_manager, mock_redis):
 
 @pytest.mark.asyncio
 async def test_authenticate_ws_valid_token():
-    with patch("app.meeting.ws_dependencies.jwt.decode") as mock_decode:
+    with patch("app.modules.meeting.ws_dependencies.jwt.decode") as mock_decode:
         mock_decode.return_value = {"sub": "user123", "type": "guest"}
 
         user_id = authenticate_ws("valid_token", db=MagicMock())
@@ -91,7 +91,8 @@ async def test_authenticate_ws_invalid_token():
     from jose import JWTError
 
     with patch(
-        "app.meeting.ws_dependencies.jwt.decode", side_effect=JWTError("Invalid")
+        "app.modules.meeting.ws_dependencies.jwt.decode",
+        side_effect=JWTError("Invalid"),
     ):
         with pytest.raises(WebSocketException) as exc:
             authenticate_ws("invalid_token", db=MagicMock())
@@ -101,7 +102,9 @@ async def test_authenticate_ws_invalid_token():
 
 @pytest.mark.asyncio
 async def test_assert_room_participant_valid():
-    with patch("app.meeting.ws_dependencies.MeetingStateService") as mock_service_class:
+    with patch(
+        "app.modules.meeting.ws_dependencies.MeetingStateService"
+    ) as mock_service_class:
         mock_service = MagicMock()
         mock_service.get_participants = AsyncMock(
             return_value={"user1": {"language": "es"}}
@@ -114,7 +117,9 @@ async def test_assert_room_participant_valid():
 
 @pytest.mark.asyncio
 async def test_assert_room_participant_invalid():
-    with patch("app.meeting.ws_dependencies.MeetingStateService") as mock_service_class:
+    with patch(
+        "app.modules.meeting.ws_dependencies.MeetingStateService"
+    ) as mock_service_class:
         mock_service = MagicMock()
         mock_service.get_participants = AsyncMock(
             return_value={"user2": {"language": "fr"}}

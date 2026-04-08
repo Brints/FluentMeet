@@ -13,8 +13,8 @@ from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 from app.core.config import settings
 from app.core.sanitize import log_sanitizer
 from app.kafka.topics import AUDIO_SYNTHESIZED, TEXT_ORIGINAL, TEXT_TRANSLATED
-from app.meeting.state import MeetingStateService
-from app.meeting.ws_dependencies import assert_room_participant, authenticate_ws
+from app.modules.meeting.state import MeetingStateService
+from app.modules.meeting.ws_dependencies import assert_room_participant, authenticate_ws
 from app.schemas.pipeline import (
     SynthesizedAudioEvent,
 )

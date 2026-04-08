@@ -78,3 +78,13 @@ class InternalServerException(FluentMeetException):
         details: list[dict[str, Any]] | None = None,
     ) -> None:
         super().__init__(500, code, message, details)
+
+
+class BadGatewayException(FluentMeetException):
+    def __init__(
+        self,
+        message: str = "Bad Gateway",
+        code: str = "BAD_GATEWAY",
+        details: list[dict[str, Any]] | None = None,
+    ) -> None:
+        super().__init__(502, code, message, details)

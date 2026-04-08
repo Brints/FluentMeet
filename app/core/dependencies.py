@@ -17,11 +17,11 @@ from jose import JWTError, jwt
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.auth.models import User
-from app.auth.token_store import TokenStoreService, get_token_store_service
 from app.core.config import settings
 from app.core.exceptions import ForbiddenException, UnauthorizedException
 from app.db.session import get_db
+from app.modules.auth.models import User
+from app.modules.auth.token_store import TokenStoreService, get_token_store_service
 
 logger = logging.getLogger(__name__)
 

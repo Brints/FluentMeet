@@ -6,10 +6,10 @@ from fastapi import APIRouter, Depends, Query, Request, status
 from fastapi.responses import JSONResponse
 from jose import jwt
 
-from app.auth.models import User
 from app.core.config import settings
 from app.core.dependencies import get_current_user, get_current_user_optional
-from app.meeting.constants import (
+from app.modules.auth.models import User
+from app.modules.meeting.constants import (
     MSG_INVITATIONS_SENT,
     MSG_MEETING_ENDED,
     MSG_MEETING_HISTORY,
@@ -20,8 +20,8 @@ from app.meeting.constants import (
     MSG_ROOM_LEFT,
     MSG_USER_ADMITTED,
 )
-from app.meeting.dependencies import get_meeting_service
-from app.meeting.schemas import (
+from app.modules.meeting.dependencies import get_meeting_service
+from app.modules.meeting.schemas import (
     InviteApiResponse,
     InviteRequest,
     JoinRoomRequest,
@@ -31,7 +31,7 @@ from app.meeting.schemas import (
     RoomCreate,
     RoomResponse,
 )
-from app.meeting.service import MeetingService
+from app.modules.meeting.service import MeetingService
 from app.services.connection_manager import get_connection_manager
 
 logger = logging.getLogger(__name__)

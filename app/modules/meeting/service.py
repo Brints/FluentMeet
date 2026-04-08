@@ -9,7 +9,6 @@ from typing import Any
 from jose import jwt
 from sqlalchemy.orm import Mapped
 
-from app.auth.models import User
 from app.core.config import settings
 from app.core.exceptions import (
     BadRequestException,
@@ -17,16 +16,17 @@ from app.core.exceptions import (
     InternalServerException,
     NotFoundException,
 )
-from app.meeting.constants import (
+from app.modules.auth.models import User
+from app.modules.meeting.constants import (
     MAX_ROOM_CODE_RETRIES,
     ROOM_CODE_BYTE_LENGTH,
     ParticipantRole,
     RoomStatus,
 )
-from app.meeting.models import MeetingInvitation, Participant, Room
-from app.meeting.repository import MeetingRepository
-from app.meeting.schemas import RoomConfigUpdate, RoomSettings
-from app.meeting.state import MeetingStateService
+from app.modules.meeting.models import MeetingInvitation, Participant, Room
+from app.modules.meeting.repository import MeetingRepository
+from app.modules.meeting.schemas import RoomConfigUpdate, RoomSettings
+from app.modules.meeting.state import MeetingStateService
 from app.services.email_producer import get_email_producer_service
 
 logger = logging.getLogger(__name__)

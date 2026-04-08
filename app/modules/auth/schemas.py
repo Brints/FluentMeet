@@ -3,7 +3,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
-from app.auth.constants import SupportedLanguage
+from app.modules.auth.constants import SupportedLanguage
 
 
 class UserBase(BaseModel):

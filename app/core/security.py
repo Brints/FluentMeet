@@ -8,8 +8,8 @@ import bcrypt
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
-from app.auth.schemas import RefreshTokenClaims
 from app.core.config import settings
+from app.modules.auth.schemas import RefreshTokenClaims
 
 # Workaround for unmaintained passlib 1.7.4.
 # Suppresses the "error reading bcrypt version" warning on bcrypt 4.0+.

@@ -8,10 +8,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from alembic import context
 
 from app.models import Base
-from app.auth.models import (
-    User,
-    VerificationToken,
-)  # noqa: F401 — required for autogenerate
+from app.modules.auth.models import User, VerificationToken
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

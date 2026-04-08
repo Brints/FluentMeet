@@ -4,9 +4,9 @@ from fastapi import Depends
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
-from app.meeting.repository import MeetingRepository
-from app.meeting.service import MeetingService
-from app.meeting.state import MeetingStateService
+from app.modules.meeting.repository import MeetingRepository
+from app.modules.meeting.service import MeetingService
+from app.modules.meeting.state import MeetingStateService
 
 
 def get_meeting_repository(db: Session = Depends(get_db)) -> MeetingRepository:

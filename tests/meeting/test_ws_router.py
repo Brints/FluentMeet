@@ -6,7 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.meeting.ws_dependencies import authenticate_ws
+from app.modules.meeting.ws_dependencies import authenticate_ws
 
 # Create a test client
 client = TestClient(app)
@@ -21,14 +21,14 @@ def override_auth():
 
 @pytest.fixture
 def mock_room_participant():
-    with patch("app.meeting.ws_router.assert_room_participant") as mock:
+    with patch("app.modules.meeting.ws_router.assert_room_participant") as mock:
         mock.return_value = {"language": "es"}
         yield mock
 
 
 @pytest.fixture
 def mock_connection_manager():
-    with patch("app.meeting.ws_router.get_connection_manager") as mock_get_cm:
+    with patch("app.modules.meeting.ws_router.get_connection_manager") as mock_get_cm:
         cm = MagicMock()
         cm.connect = AsyncMock()
         cm.disconnect = MagicMock()
@@ -40,7 +40,9 @@ def mock_connection_manager():
 
 @pytest.fixture
 def mock_audio_ingest():
-    with patch("app.meeting.ws_router.get_audio_ingest_service") as mock_get_ingest:
+    with patch(
+        "app.modules.meeting.ws_router.get_audio_ingest_service"
+    ) as mock_get_ingest:
         ingest = MagicMock()
         ingest.reset_sequence = MagicMock()
         ingest.publish_audio_chunk = AsyncMock()
@@ -50,7 +52,7 @@ def mock_audio_ingest():
 
 @pytest.fixture
 def mock_kafka_consumer():
-    with patch("app.meeting.ws_router.AIOKafkaConsumer") as mock_consumer_class:
+    with patch("app.modules.meeting.ws_router.AIOKafkaConsumer") as mock_consumer_class:
         consumer = AsyncMock()
         consumer.start = AsyncMock()
         consumer.stop = AsyncMock()

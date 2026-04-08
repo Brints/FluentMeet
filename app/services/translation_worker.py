@@ -17,7 +17,7 @@ from app.external_services.deepl.service import (
 from app.kafka.consumer import BaseConsumer
 from app.kafka.schemas import BaseEvent
 from app.kafka.topics import TEXT_ORIGINAL, TEXT_TRANSLATED
-from app.meeting.state import MeetingStateService
+from app.modules.meeting.state import MeetingStateService
 from app.schemas.pipeline import (
     TranscriptionEvent,
     TranslationEvent,

@@ -1,9 +1,9 @@
 from fastapi import APIRouter
 
-from app.auth.router import router as auth_router
-from app.meeting.router import router as meeting_router
-from app.meeting.ws_router import router as ws_router
-from app.user.router import router as users_router
+from app.modules.auth.router import router as auth_router
+from app.modules.meeting.router import router as meeting_router
+from app.modules.meeting.ws_router import router as ws_router
+from app.modules.user.router import router as users_router
 
 api_router = APIRouter()
 api_router.include_router(auth_router)
