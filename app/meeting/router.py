@@ -32,6 +32,7 @@ from app.meeting.schemas import (
     RoomResponse,
 )
 from app.meeting.service import MeetingService
+from app.services.connection_manager import get_connection_manager
 
 logger = logging.getLogger(__name__)
 
@@ -242,6 +243,12 @@ async def update_config(
     settings_data = service.update_config(
         host=current_user, room_code=room_code, config=payload
     )
+
+    manager = get_connection_manager()
+    await manager.broadcast_to_room(
+        room_code, {"event": "room_config_updated", "settings": settings_data}
+    )
+
     return JSONResponse(
         content={
             "status": "success",

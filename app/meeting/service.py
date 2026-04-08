@@ -471,9 +471,9 @@ class MeetingService:
         if room.host_id != host.id:
             raise ForbiddenException(message="Only the host can modify room settings.")
 
-        if room.status == RoomStatus.ENDED.value:
+        if room.status != RoomStatus.ACTIVE.value:
             raise BadRequestException(
-                code="ROOM_NOT_ACTIVE", message="Cannot modify an ended meeting."
+                code="ROOM_NOT_ACTIVE", message="Only active meetings can be modified."
             )
 
         update_dict = config.model_dump(exclude_unset=True)

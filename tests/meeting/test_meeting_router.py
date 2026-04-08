@@ -4,6 +4,7 @@ Uses an in-memory SQLite database, FakeRedis, and the FastAPI TestClient
 to exercise full request → response cycles through ``/api/v1/meetings``.
 """
 
+import unittest
 from collections.abc import Generator
 from unittest.mock import AsyncMock
 
@@ -573,15 +574,30 @@ class TestUpdateConfigRoute:
         room_data = await _create_room_via_api(client, token)
         room_code = room_data["room_code"]
 
-        resp = await client.patch(
-            f"/api/v1/meetings/{room_code}/config",
-            json={"lock_room": True},
+        # Activate room
+        await client.post(
+            f"/api/v1/meetings/{room_code}/join",
+            json={},
             headers=_auth_headers(token),
         )
 
-        assert resp.status_code == 200
-        body = resp.json()
-        assert body["data"]["settings"]["lock_room"] is True
+        with unittest.mock.patch(
+            "app.services.connection_manager.ConnectionManager.broadcast_to_room",
+            new_callable=AsyncMock,
+        ) as mock_broadcast:
+            resp = await client.patch(
+                f"/api/v1/meetings/{room_code}/config",
+                json={"lock_room": True},
+                headers=_auth_headers(token),
+            )
+
+            assert resp.status_code == 200
+            body = resp.json()
+            assert body["data"]["settings"]["lock_room"] is True
+            mock_broadcast.assert_called_once_with(
+                room_code,
+                {"event": "room_config_updated", "settings": body["data"]["settings"]},
+            )
 
     @pytest.mark.asyncio
     async def test_non_host_cannot_update_config(
@@ -596,12 +612,58 @@ class TestUpdateConfigRoute:
         room_data = await _create_room_via_api(client, host_token)
         room_code = room_data["room_code"]
 
+        # Host joins to activate it
+        await client.post(
+            f"/api/v1/meetings/{room_code}/join",
+            json={},
+            headers=_auth_headers(host_token),
+        )
+
         resp = await client.patch(
             f"/api/v1/meetings/{room_code}/config",
             json={"lock_room": True},
             headers=_auth_headers(other_token),
         )
         assert resp.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_cannot_update_ended_or_pending_room(
+        self, client: httpx.AsyncClient, db_session: Session
+    ) -> None:
+        _seed_user(db_session)
+        token = await _login(client)
+
+        room_data = await _create_room_via_api(client, token)
+        room_code = room_data["room_code"]
+
+        # Pending room
+        resp = await client.patch(
+            f"/api/v1/meetings/{room_code}/config",
+            json={"lock_room": True},
+            headers=_auth_headers(token),
+        )
+        assert resp.status_code == 400
+
+        # Activate
+        await client.post(
+            f"/api/v1/meetings/{room_code}/join",
+            json={},
+            headers=_auth_headers(token),
+        )
+
+        # End room
+        await client.post(
+            f"/api/v1/meetings/{room_code}/end",
+            headers=_auth_headers(token),
+        )
+
+        # Ended room
+        resp2 = await client.patch(
+            f"/api/v1/meetings/{room_code}/config",
+            json={"lock_room": True},
+            headers=_auth_headers(token),
+        )
+        assert resp2.status_code == 400
 
 
 # ---------------------------------------------------------------------------
