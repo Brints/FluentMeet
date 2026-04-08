@@ -1,9 +1,11 @@
 import logging
 import uuid
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.exceptions import (
     ConflictException,
     ForbiddenException,
@@ -12,7 +14,7 @@ from app.core.exceptions import (
 from app.core.sanitize import sanitize_log_args
 from app.core.security import SecurityService
 from app.modules.auth.account_lockout import AccountLockoutService
-from app.modules.auth.models import User
+from app.modules.auth.models import PasswordResetToken, User
 from app.modules.auth.schemas import (
     LoginRequest,
     LoginResponse,
@@ -169,18 +171,41 @@ class AuthService:
 
     async def forgot_password(self, email: str, frontend_base_url: str) -> None:
         user = self.get_user_by_email(email)
-        if not user:
+        if (
+            not user
+            or not user.is_active
+            or user.deleted_at is not None
+            or not user.is_verified
+        ):
             return
 
-        reset_link = (
-            f"{frontend_base_url}/reset-password?user={user.id}&token={uuid.uuid4()}"
+        # Delete existing tokens for this user
+        existing_tokens = self.db.scalars(
+            select(PasswordResetToken).where(PasswordResetToken.user_id == user.id)
+        ).all()
+        for token in existing_tokens:
+            self.db.delete(token)
+
+        # Create new token
+        expires_at = datetime.now(UTC) + timedelta(
+            minutes=settings.PASSWORD_RESET_TOKEN_EXPIRE_MINUTES
         )
+        reset_token = PasswordResetToken(user_id=user.id, expires_at=expires_at)
+        self.db.add(reset_token)
+        self.db.commit()
+        self.db.refresh(reset_token)
+
+        reset_link = f"{frontend_base_url}/reset-password?token={reset_token.token}"
         try:
             await self.email_producer.send_email(
                 to=user.email,
                 subject="Reset your FluentMeet password",
                 html_body=None,
-                template_data={"reset_link": reset_link},
+                template_data={
+                    "full_name": user.full_name or "User",
+                    "reset_link": reset_link,
+                    "expires_in_minutes": settings.PASSWORD_RESET_TOKEN_EXPIRE_MINUTES,
+                },
                 template="password_reset",
             )
         except Exception as exc:

@@ -7,6 +7,7 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.core.rate_limiter import limiter
 from app.db.session import get_db
 from app.main import app
 from app.models.base import Base
@@ -55,8 +56,11 @@ def client(
 
     app.dependency_overrides[get_db] = _override_get_db
     app.dependency_overrides[get_email_producer_service] = _override_email_producer
+
+    limiter.enabled = False
     with TestClient(app) as test_client:
         yield test_client
+    limiter.enabled = True
     app.dependency_overrides.clear()
 
 
@@ -144,18 +148,19 @@ def test_forgot_password_returns_generic_accepted_response(
 
     response = client.post("/api/v1/auth/forgot-password", json=payload)
 
-    assert response.status_code == 202
+    assert response.status_code == 200
     assert response.json() == {
+        "status": "ok",
         "message": (
-            "If an account with that email exists,"
-            " we have sent password reset instructions."
-        )
+            "If an account with this email exists, a password reset link has been sent."
+        ),
     }
     email_producer_mock.send_email.assert_not_awaited()
 
 
 def test_forgot_password_enqueues_reset_email_for_existing_user(
     client: TestClient,
+    db_session: Session,
     email_producer_mock: AsyncMock,
 ) -> None:
     signup_payload = {
@@ -163,7 +168,16 @@ def test_forgot_password_enqueues_reset_email_for_existing_user(
         "password": "MyStr0ngP@ss!",
         "full_name": "Reset User",
     }
-    assert client.post("/api/v1/auth/signup", json=signup_payload).status_code == 201
+    signup_response = client.post("/api/v1/auth/signup", json=signup_payload)
+    assert signup_response.status_code == 201
+
+    # Mark user as verified so forgot_password enqueues email
+    user = db_session.execute(
+        select(User).where(User.email == "pwreset@example.com")
+    ).scalar_one()
+    user.is_verified = True
+    db_session.commit()
+
     email_producer_mock.send_email.reset_mock()
 
     response = client.post(
@@ -171,5 +185,5 @@ def test_forgot_password_enqueues_reset_email_for_existing_user(
         json={"email": "pwreset@example.com"},
     )
 
-    assert response.status_code == 202
+    assert response.status_code == 200
     email_producer_mock.send_email.assert_awaited_once()

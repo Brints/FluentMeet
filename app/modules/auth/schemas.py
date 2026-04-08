@@ -112,6 +112,7 @@ class ForgotPasswordRequest(BaseModel):
 
 
 class ActionAcknowledgement(BaseModel):
+    status: str = "ok"
     message: str
 
 

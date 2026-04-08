@@ -1,4 +1,5 @@
 import logging
+from typing import cast
 
 from fastapi import APIRouter, Depends, Query, Request, status
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -169,21 +170,21 @@ async def resend_verification(
 @router.post(
     "/forgot-password",
     response_model=ActionAcknowledgement,
-    status_code=status.HTTP_202_ACCEPTED,
+    status_code=status.HTTP_200_OK,
 )
+@limiter.limit("5/minute")
 async def forgot_password(
-    request: ForgotPasswordRequest,
+    request: Request,
+    payload: ForgotPasswordRequest,
     auth_service: AuthService = Depends(get_auth_service),
 ) -> ActionAcknowledgement:
+    del request  # consumed by slowapi
     await auth_service.forgot_password(
-        email=str(request.email),
+        email=str(payload.email),
         frontend_base_url=settings.FRONTEND_BASE_URL,
     )
     return ActionAcknowledgement(
-        message=(
-            "If an account with that email exists,"
-            " we have sent password reset instructions."
-        )
+        message="If an account with this email exists, a password reset link has been sent.",  # noqa: E501
     )
 
 
@@ -296,7 +297,7 @@ async def google_callback(
 
     # 3. Resolve user
     login_response, refresh_token, refresh_ttl = await auth_service.resolve_oauth_user(
-        email=email,
+        email=cast(str, email),
         google_id=google_id,
         name=name,
         avatar_url=avatar,

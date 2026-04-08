@@ -182,9 +182,10 @@ def test_resend_verification_generates_new_token_and_enqueues_email(
 
     assert response.status_code == 200
     assert response.json() == {
+        "status": "ok",
         "message": (
             "If an account with that email exists, we have sent a verification email."
-        )
+        ),
     }
     email_producer_mock.send_email.assert_awaited_once()
 
