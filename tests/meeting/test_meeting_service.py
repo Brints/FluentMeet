@@ -674,7 +674,9 @@ class TestUpdateConfig:
         config = MagicMock()
         config.model_dump.return_value = {"lock_room": True}
 
-        with pytest.raises(BadRequestException, match="ended meeting"):
+        with pytest.raises(
+            BadRequestException, match="Only active meetings can be modified"
+        ):
             svc.update_config(host=host, room_code="ABCDEF123456", config=config)
 
     def test_missing_room_raises(self) -> None:
