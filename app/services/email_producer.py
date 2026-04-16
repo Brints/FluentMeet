@@ -10,7 +10,11 @@ logger = logging.getLogger(__name__)
 
 
 class EmailProducerService:
-    """Publishes email dispatch events to Kafka."""
+    """Publishes email dispatch events to Kafka.
+
+    Attributes:
+        _topic: The target Kafka topic for email notifications.
+    """
 
     def __init__(self, topic: str = NOTIFICATIONS_EMAIL) -> None:
         self._topic = topic
@@ -23,6 +27,15 @@ class EmailProducerService:
         template_data: dict[str, Any],
         template: str,
     ) -> None:
+        """Schedule an email for dispatch by publishing it to Kafka.
+
+        Args:
+            to (str): Recipient email address.
+            subject (str): Email subject.
+            html_body (str | None): Raw HTML content, if pre-rendered.
+            template_data (dict[str, Any]): Context variables for Jinja templating.
+            template (str): The name of the template to be used if html_body is missing.
+        """
         payload = EmailPayload(
             to=to,
             subject=subject,
@@ -42,4 +55,9 @@ _email_producer_service = EmailProducerService()
 
 
 def get_email_producer_service() -> EmailProducerService:
+    """Retrieve the singleton instance of EmailProducerService.
+
+    Returns:
+        EmailProducerService: The static service instance.
+    """
     return _email_producer_service

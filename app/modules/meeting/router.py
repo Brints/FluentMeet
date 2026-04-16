@@ -1,5 +1,11 @@
 """REST API endpoints for the meeting feature package."""
 
+"""Meeting API Router module.
+
+Registers the public FastApi routes mapping stateless token schemas against
+video conferencing logic layers locally.
+"""
+
 import logging
 
 from fastapi import APIRouter, Depends, Query, Request, status

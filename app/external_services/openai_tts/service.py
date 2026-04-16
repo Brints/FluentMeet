@@ -1,4 +1,4 @@
-"""OpenAI Text-to-Speech service.
+"""OpenAI Text-to-Speech service module.
 
 Wraps the OpenAI TTS API (/v1/audio/speech) to convert translated text
 into synthesized audio bytes. Returns raw audio in the configured format.
@@ -22,7 +22,14 @@ _FORMAT_MAP = {
 
 
 class OpenAITTSService:
-    """Stateless service for converting text to speech via OpenAI."""
+    """Stateless service for converting text to speech via OpenAI.
+
+    Provides an asynchronous native wrapper mapping to the REST API,
+    translating localized strings into binary audio representations.
+
+    Attributes:
+        _timeout (float): Max timeout for HTTP requests mapping to OpenAI.
+    """
 
     def __init__(self, timeout: float = 15.0) -> None:
         self._timeout = timeout
@@ -37,12 +44,13 @@ class OpenAITTSService:
         """Convert text to audio bytes via OpenAI TTS.
 
         Args:
-            text: The text to synthesize.
-            voice: OpenAI voice ID (alloy, echo, fable, onyx, nova, shimmer).
-            encoding: Output encoding (``linear16`` or ``opus``).
+            text (str): The text to synthesize.
+            voice (str | None): OpenAI voice ID (alloy, echo, fable, onyx, nova, shimmer). Defaults to None.
+            encoding (str): Output encoding (``linear16`` or ``opus``). Defaults to "linear16".
 
         Returns:
-            A dict with ``audio_bytes``, ``sample_rate``, ``latency_ms``.
+            dict: A dictionary containing ``audio_bytes``, ``sample_rate``,
+            and ``latency_ms``.
 
         Raises:
             httpx.HTTPStatusError: On non-2xx responses from OpenAI.

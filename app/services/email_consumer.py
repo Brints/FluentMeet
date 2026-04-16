@@ -19,14 +19,31 @@ class TransientEmailDeliveryError(Exception):
 
 
 class EmailTemplateRenderer:
+    """Compiles Jinja2 templates into HTML.
+
+    Attributes:
+        _environment: The configured Jinja2 template environment.
+    """
+
     def __init__(self) -> None:
-        templates_root = Path(__file__).resolve().parent.parent / "templates" / "email"
+        templates_root = (
+            Path(__file__).resolve().parent.parent.parent / "templates" / "email"
+        )
         self._environment = Environment(
             loader=FileSystemLoader(str(templates_root)),
             autoescape=True,
         )
 
     def render(self, template_name: str, data: dict[str, object]) -> str:
+        """Render a Jinja2 template with the given data.
+
+        Args:
+            template_name (str): The name of the HTML template file (without extension).
+            data (dict[str, object]): The context variables to inject.
+
+        Returns:
+            str: The rendered HTML content.
+        """
         try:
             template = self._environment.get_template(f"{template_name}.html")
         except TemplateNotFound:
@@ -40,7 +57,11 @@ class EmailTemplateRenderer:
 
 
 class MailgunEmailSender:
-    """Sends emails via Mailgun's /messages endpoint."""
+    """Sends emails via Mailgun's /messages endpoint.
+
+    Attributes:
+        _timeout_seconds: HTTP client timeout for Mailgun API requests.
+    """
 
     def __init__(
         self, timeout_seconds: float = settings.MAILGUN_TIMEOUT_SECONDS
@@ -48,6 +69,13 @@ class MailgunEmailSender:
         self._timeout_seconds = timeout_seconds
 
     async def send(self, to: str, subject: str, html_body: str) -> None:
+        """Dispatch an email payload to the Mailgun API.
+
+        Args:
+            to (str): The recipient's email address.
+            subject (str): The subject line of the email.
+            html_body (str): The rendered HTML body content.
+        """
         if not settings.MAILGUN_API_KEY or not settings.MAILGUN_DOMAIN:
             logger.warning("Mailgun credentials not configured; skipping dispatch")
             return
@@ -84,6 +112,16 @@ class MailgunEmailSender:
 
 
 class EmailConsumerWorker(BaseConsumer):
+    """Kafka consumer worker for email dispatch.
+
+    Attributes:
+        topic: The Kafka topic being consumed.
+        group_id: Consumer group identifier.
+        event_schema: Pydantic schema used to validate incoming events.
+        _sender: Service instance handling Mailgun dispatch.
+        _renderer: Service instance handling HTML templating.
+    """
+
     topic = NOTIFICATIONS_EMAIL
     group_id = settings.KAFKA_EMAIL_CONSUMER_GROUP_ID
     event_schema = EmailEvent
@@ -94,6 +132,11 @@ class EmailConsumerWorker(BaseConsumer):
         self._renderer = EmailTemplateRenderer()
 
     async def handle(self, event: BaseEvent[Any]) -> None:
+        """Process an email event, render the template, and dispatch.
+
+        Args:
+            event (BaseEvent[Any]): The deserialized Kafka message payload.
+        """
         email_event = EmailEvent.model_validate(event.model_dump())
         html_body = email_event.payload.html_body
         if not html_body:

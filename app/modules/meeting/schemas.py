@@ -1,5 +1,10 @@
 """Pydantic schemas for the meeting feature package."""
 
+"""Meeting Pydantic schemas module.
+
+Strictly defines JSON constraints validating bounding API requests automatically natively.
+"""
+
 import uuid
 from datetime import datetime
 

@@ -37,6 +37,11 @@ class TTSWorker(BaseConsumer):
     Supports two providers (switchable via ``ACTIVE_TTS_PROVIDER``):
         - ``"openai"`` — OpenAI TTS (tts-1)
         - ``"voiceai"`` — Voice.ai TTS (voiceai-tts-multilingual-v1-latest)
+
+    Attributes:
+        topic: The Kafka topic for incoming translated text events.
+        group_id: Consumer group identifier for TTS generation.
+        event_schema: Pydantic schema used to validate incoming translation events.
     """
 
     topic = TEXT_TRANSLATED
@@ -44,7 +49,11 @@ class TTSWorker(BaseConsumer):
     event_schema = TranslationEvent
 
     async def handle(self, event: BaseEvent[Any]) -> None:
-        """Process a translation: synthesize audio → publish."""
+        """Process a translation: synthesize audio → publish.
+
+        Args:
+            event (BaseEvent[Any]): The deserialized wrapper containing the TranslationPayload.
+        """
         tl_event = TranslationEvent.model_validate(event.model_dump())
         payload = tl_event.payload
 
@@ -101,8 +110,13 @@ class TTSWorker(BaseConsumer):
     async def _synthesize(self, *, text: str, language: str, encoding: str) -> dict:
         """Dispatch to the active TTS provider.
 
+        Args:
+            text (str): The translated native text to synthesize.
+            language (str): The language code of the text.
+            encoding (str): The desired output audio format encoding.
+
         Returns:
-            A dict with ``audio_bytes`` and ``sample_rate``.
+            dict: A dictionary containing 'audio_bytes' and the 'sample_rate' metadata.
         """
         provider = settings.ACTIVE_TTS_PROVIDER.lower()
 

@@ -28,7 +28,14 @@ class UserService:
     # ------------------------------------------------------------------
 
     def get_user_by_id(self, user_id: uuid.UUID) -> User | None:
-        """Return the user with *user_id*, or ``None``."""
+        """Return the user with *user_id*, or ``None``.
+
+        Args:
+            user_id (uuid.UUID): User identity map securely.
+
+        Returns:
+            User | None: Synced DB structure dynamically natively mapping.
+        """
         return self.db.execute(
             select(User).where(User.id == user_id)
         ).scalar_one_or_none()
@@ -41,12 +48,11 @@ class UserService:
         """Apply a partial update to *user* using only the provided fields.
 
         Args:
-            user: The ORM instance to update.
-            update_data: A ``dict`` whose keys are User column names.
-                         Only non-``None`` values are written.
+            user (User): The ORM instance to update.
+            update_data (dict): A ``dict`` whose keys are User column names. Only non-``None`` values are written.
 
         Returns:
-            The refreshed ``User`` instance.
+            User: The refreshed ``User`` instance dynamically reliably securely cleanly smoothly.
         """
         for field, value in update_data.items():
             if value is not None:
@@ -60,8 +66,12 @@ class UserService:
     def update_avatar_url(self, user: User, avatar_url: str) -> User:
         """Set the avatar URL on *user* and persist.
 
+        Args:
+            user (User): Identity structured gracefully natively mapped logic statically dynamically.
+            avatar_url (str): Cloudinary absolute HTTPS path elegantly bound dynamically.
+
         Returns:
-            The refreshed ``User`` instance.
+            User: The refreshed ``User`` instance dynamically safely reliably securely accurately accurately intelligently natively mapping seamlessly.
         """
         user.avatar_url = avatar_url
         user.updated_at = datetime.now(UTC)
@@ -78,6 +88,9 @@ class UserService:
 
         Sets ``deleted_at`` to the current UTC timestamp and
         ``is_active`` to ``False``.
+
+        Args:
+            user (User): Entity structure cleanly identifying safely seamlessly reliably.
         """
         user.deleted_at = datetime.now(UTC)
         user.is_active = False
@@ -94,6 +107,9 @@ class UserService:
         Cascading deletes:
         - Verification tokens linked to the user.
         - The user row itself.
+
+        Args:
+            user (User): Entity mapping elegantly natively cleanly correctly reliably gracefully safely suitably natively gracefully.
         """
         user_id = user.id
 

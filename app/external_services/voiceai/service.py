@@ -1,4 +1,4 @@
-"""Voice.ai Text-to-Speech service.
+"""Voice.ai Text-to-Speech service module.
 
 Wraps the Voice.ai TTS API (POST /api/v1/tts/speech) to convert translated
 text into synthesized audio. Supports multilingual voices, PCM/Opus output,
@@ -25,7 +25,14 @@ _FORMAT_MAP = {
 
 
 class VoiceAITTSService:
-    """Stateless service for converting text to speech via Voice.ai."""
+    """Stateless service for converting text to speech via Voice.ai.
+
+    Provides an asynchronous native wrapper mapping to the REST API,
+    translating localized strings into binary audio representations.
+
+    Attributes:
+        _timeout (float): Max timeout for HTTP requests mapping to Voice.ai.
+    """
 
     def __init__(self, timeout: float = 60.0) -> None:
         self._timeout = timeout
@@ -41,13 +48,14 @@ class VoiceAITTSService:
         """Convert text to audio bytes via Voice.ai TTS.
 
         Args:
-            text: The text to synthesize.
-            language: ISO 639-1 language code for voice selection.
-            voice_id: Optional Voice.ai voice ID. Uses default if omitted.
-            encoding: Output encoding (``linear16`` or ``opus``).
+            text (str): The text to synthesize.
+            language (str): ISO 639-1 language code for voice selection. Defaults to "en".
+            voice_id (str | None): Optional Voice.ai voice ID. Uses default if omitted.
+            encoding (str): Output encoding (``linear16`` or ``opus``). Defaults to "linear16".
 
         Returns:
-            A dict with ``audio_bytes``, ``sample_rate``, ``latency_ms``.
+            dict: A dictionary containing ``audio_bytes``, ``sample_rate``,
+            and ``latency_ms``.
 
         Raises:
             httpx.HTTPStatusError: On non-2xx responses from Voice.ai.

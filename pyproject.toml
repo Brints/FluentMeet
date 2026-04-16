@@ -46,7 +46,13 @@ target-version = "py311"
 # Unlike Flake8, Ruff doesn't enable all `E` and `F` codes by default.
 # See: https://docs.astral.sh/ruff/rules/
 select = ["B", "E", "F", "I", "W", "C90", "UP", "ASYNC", "PT", "ARG", "PTH", "SIM", "PLE", "PLW", "RUF"]
-ignore = ["B008"]
+ignore = [
+    "B008", # Do not perform implicit string concatenation, use explicit concatenation instead.
+    "D100", # Missing docstring in public module
+    "D101", # Missing docstring in public class
+    "D104", # Allow missing __init__.py docstring initially
+    "S101", # Use of assert detected. The enclosed code will be removed when compiling to optimised bytecode.
+]
 
 # Allow fix for all enabled rules (when `--fix`) is provided.
 fixable = ["ALL"]
@@ -54,6 +60,9 @@ unfixable = []
 
 [tool.ruff.lint.mccabe]
 max-complexity = 10
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
 
 [tool.ruff.format]
 quote-style = "double"

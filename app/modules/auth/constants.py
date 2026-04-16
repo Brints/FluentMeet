@@ -1,3 +1,5 @@
+"""Authentication Constants and Enum Definitions module."""
+
 import enum
 
 

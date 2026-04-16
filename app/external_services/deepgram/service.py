@@ -1,4 +1,4 @@
-"""Deepgram Speech-to-Text service.
+"""Deepgram Speech-to-Text service module.
 
 Wraps the Deepgram REST API (/v1/listen) for pre-recorded audio
 transcription. Each call sends a single audio chunk and returns
@@ -17,7 +17,15 @@ logger = logging.getLogger(__name__)
 
 
 class DeepgramSTTService:
-    """Stateless service for converting audio bytes to text via Deepgram."""
+    """Stateless service for converting audio bytes to text via Deepgram.
+
+    Provides a centralized client to execute audio transcription calls against
+    the Deepgram API using httpx async clients. It isolates the HTTP retry
+    timeout and API authentication headers injection from the rest of the app.
+
+    Attributes:
+        _timeout (float): Max timeout for HTTP requests mapping to Deepgram.
+    """
 
     def __init__(self, timeout: float = 10.0) -> None:
         self._timeout = timeout

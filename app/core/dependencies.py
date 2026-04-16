@@ -39,18 +39,20 @@ async def get_current_user(
 ) -> User:
     """Decode an access-token JWT and return the authenticated user.
 
-    Guards
-    ------
-    - Missing token          →  401
-    - Invalid / expired JWT  →  401
-    - Blacklisted JTI        →  401
-    - User not found          →  401
-    - Account soft-deleted    →  403
-    - Account deactivated     →  403
+    Args:
+        token (str | None): OAuth2 password bearer token. 
+            Defaults to Depends(oauth2_scheme).
+        bearer (HTTPAuthorizationCredentials | None): HTTP bearer credentials. 
+            Defaults to Depends(bearer_scheme).
+        db (Session): Database session.
+        token_store (TokenStoreService): Redis-backed token store service.
 
-    Returns
-    -------
-    The :class:`~app.auth.models.User` ORM instance.
+    Raises:
+        UnauthorizedException: If missing token, invalid JWT, revoked JTI, or not found.
+        ForbiddenException: If the account is soft-deleted or deactivated.
+
+    Returns:
+        User: The authenticated User ORM instance.
     """
     # Prefer Bearer token if provided (e.g. from 'HTTP Bearer' field in Swagger)
     # otherwise fall back to OAuth2 token (from 'Authorize' login form).
@@ -125,7 +127,19 @@ async def get_current_user_optional(
     db: Session = Depends(get_db),
     token_store: TokenStoreService = Depends(get_token_store_service),
 ) -> User | None:
-    """Attempt to decode JWT and return User if present, otherwise return None."""
+    """Attempt to decode JWT and return User if present, otherwise return None.
+
+    Args:
+        token (str | None): OAuth2 password bearer token. 
+            Defaults to Depends(oauth2_scheme).
+        bearer (HTTPAuthorizationCredentials | None): HTTP bearer credentials. 
+            Defaults to Depends(bearer_scheme).
+        db (Session): Database session.
+        token_store (TokenStoreService): Redis-backed token store service.
+
+    Returns:
+        User | None: The authenticated User ORM instance or None if missing/invalid.
+    """
     try:
         user = await get_current_user(
             token=token, bearer=bearer, db=db, token_store=token_store

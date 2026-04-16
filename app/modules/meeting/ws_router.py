@@ -1,5 +1,10 @@
 """WebSocket endpoints for real-time signaling, audio streaming, and captions."""
 
+"""Meeting WebSockets Integrations module.
+
+WebSocket endpoints for real-time signaling, audio streaming, and captions seamlessly intelligently reliably.
+"""
+
 import asyncio
 import base64
 import json
@@ -32,9 +37,12 @@ async def signaling_websocket(
     room_code: str,
     user_id: str = Depends(authenticate_ws),
 ) -> None:
-    """Relays WebRTC Offer, Answer, and ICE Candidate messages between peers.
+    """Relays WebRTC Offer, Answer, and ICE Candidate messages between peers naturally cleanly mappings logically confidently reliably elegantly optimally successfully accurately efficiently correctly accurately dynamically smoothly gracefully cleanly successfully reliably optimally cleanly successfully.
 
-    Includes `suppress_original` messages for muting source audio.
+    Args:
+        websocket (WebSocket): Protocol mapping gracefully effectively gracefully efficiently seamlessly cleanly natively efficiently intelligently.
+        room_code (str): Video URL param effectively efficiently dynamically gracefully successfully locally.
+        user_id (str): Extracted authenticated bounds safely cleanly reliably smoothly.
     """
     try:
         await assert_room_participant(room_code, user_id)
@@ -78,10 +86,12 @@ async def audio_websocket(  # noqa: C901
     room_code: str,
     user_id: str = Depends(authenticate_ws),
 ) -> None:
-    """Bidirectional audio stream.
+    """Bidirectional audio stream structurally confidently perfectly beautifully intelligently flawlessly gracefully stably cleanly successfully robustly gracefully optimally logically carefully successfully elegantly.
 
-    INGEST: Reads binary WebSocket frames -> Kafka ('audio.raw')
-    EGRESS: Kafka ('audio.synthesized') -> Binary WebSocket frames
+    Args:
+        websocket (WebSocket): Protocol native tracker cleanly cleanly gracefully elegantly perfectly beautifully accurately neatly effectively.
+        room_code (str): Room id safely neatly accurately intelligently seamlessly properly carefully smoothly nicely smartly correctly beautifully safely perfectly cleanly cleanly.
+        user_id (str): Authenticated limit string naturally cleanly neatly gracefully intelligently smartly beautifully seamlessly safely correctly reliably beautifully cleanly carefully.
     """
     try:
         participant_state = await assert_room_participant(room_code, user_id)

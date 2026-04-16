@@ -42,6 +42,12 @@ class SecurityService:
 
         Falls back to raw ``bcrypt`` if passlib's backend probing fails
         (common with newer bcrypt builds).
+
+        Args:
+            password (str): Raw string format password.
+
+        Returns:
+            str: Hashed string variant mapped for database insertion.
         """
         try:
             return cast(str, self.pwd_context.hash(password))
@@ -54,6 +60,13 @@ class SecurityService:
 
         Falls back to raw ``bcrypt.checkpw`` when passlib's backend
         probing fails (same compatibility issue as :meth:`hash_password`).
+
+        Args:
+            plain_password (str): Plain text password provided by the user.
+            hashed_password (str): Hashed password value stored in the database.
+
+        Returns:
+            bool: True if passwords match, otherwise False.
         """
         try:
             return bool(self.pwd_context.verify(plain_password, hashed_password))
@@ -77,8 +90,12 @@ class SecurityService:
     ) -> tuple[str, int]:
         """Create a short-lived JWT access token.
 
+        Args:
+            email (str): The user's email.
+            jti (str | None): Optional JWT ID. Defaults to None.
+
         Returns:
-            A ``(token, expires_in_seconds)`` tuple.
+            tuple[str, int]: A ``(token, expires_in_seconds)`` tuple.
         """
         jti = jti or str(uuid4())
         expires_delta = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -104,8 +121,12 @@ class SecurityService:
     ) -> tuple[str, str, int]:
         """Create a long-lived JWT refresh token.
 
+        Args:
+            email (str): The user's email.
+            jti (str | None): Optional JWT ID. Defaults to None.
+
         Returns:
-            A ``(token, jti, ttl_seconds)`` tuple.
+            tuple[str, str, int]: A ``(token, jti, ttl_seconds)`` tuple.
         """
         jti = jti or str(uuid4())
         ttl_seconds = settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400

@@ -1,3 +1,5 @@
+"""Google OAuth 2.0 Integration module."""
+
 import urllib.parse
 from typing import Any, cast
 
@@ -14,6 +16,14 @@ class OAuthProviderException(BadGatewayException):
 
 
 class GoogleOAuthService:
+    """Oauth2 Proxy wrapping OpenID Connect callbacks dynamically against Google environments.
+
+    Attributes:
+        client_id (str): Google Client ID.
+        client_secret (str): Google Client Secret natively.
+        redirect_uri (str): Allowed Oauth 2.0 callback destination natively tracked securely.
+    """
+
     def __init__(self, client_id: str, client_secret: str, redirect_uri: str):
         self.client_id = client_id
         self.client_secret = client_secret
@@ -23,6 +33,14 @@ class GoogleOAuthService:
         self.userinfo_url = "https://www.googleapis.com/oauth2/v3/userinfo"
 
     def build_auth_url(self, state: str) -> str:
+        """Construct the initial redirect URL authorizing Google access.
+
+        Args:
+            state (str): Unique cryptographic state proxying tokens mitigating CSRF risks.
+
+        Returns:
+            str: Absolute https URI routing user browsers natively to Google Consent architectures.
+        """
         params = {
             "client_id": self.client_id,
             "redirect_uri": self.redirect_uri,
@@ -35,6 +53,14 @@ class GoogleOAuthService:
         return f"{self.auth_url}?{urllib.parse.urlencode(params)}"
 
     async def exchange_code(self, code: str) -> str:
+        """Exchange the Oauth2 authorization code for a valid access_token.
+
+        Args:
+            code (str): Time-sensitive exchange code provided by Google callback queries.
+
+        Returns:
+            str: Issued OAuth Bearer Access Token.
+        """
         data = {
             "client_id": self.client_id,
             "client_secret": self.client_secret,
@@ -53,6 +79,14 @@ class GoogleOAuthService:
                 ) from err
 
     async def get_user_info(self, access_token: str) -> dict[str, Any]:
+        """Query Google userinfo node extracting raw profile graphs dynamically.
+
+        Args:
+            access_token (str): Validated Bearer Token retrieved via `exchange_code`.
+
+        Returns:
+            dict[str, Any]: Parsed JSON response from Google including `email` natively.
+        """
         headers = {"Authorization": f"Bearer {access_token}"}
         async with httpx.AsyncClient() as client:
             try:

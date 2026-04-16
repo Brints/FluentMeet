@@ -22,7 +22,13 @@ logger = logging.getLogger(__name__)
 
 
 class ConnectionManager:
-    """Manages WebSocket connections and multi-instance Pub/Sub scaling."""
+    """Manages WebSocket connections and multi-instance Pub/Sub scaling.
+
+    Attributes:
+        active_connections: Mapping of room codes to open user websockets.
+        _pubsub_tasks: Tracking active background listener tasks per room.
+        redis: The Redis client for pub/sub operations.
+    """
 
     def __init__(self, redis_client: Redis) -> None:
         # Maps room_code -> { user_id -> WebSocket }
@@ -32,7 +38,13 @@ class ConnectionManager:
         self.redis = redis_client
 
     async def connect(self, room_code: str, user_id: str, websocket: WebSocket) -> None:
-        """Register an accepted WebSocket connection in the manager."""
+        """Register an accepted WebSocket connection in the manager.
+
+        Args:
+            room_code (str): The active room code.
+            user_id (str): The connecting participant's user id.
+            websocket (WebSocket): The active websocket connection.
+        """
         if room_code not in self.active_connections:
             self.active_connections[room_code] = {}
             # Start pub/sub listener for the room
@@ -46,7 +58,12 @@ class ConnectionManager:
         )
 
     def disconnect(self, room_code: str, user_id: str) -> None:
-        """Remove a WebSocket connection from the manager."""
+        """Remove a WebSocket connection from the manager.
+
+        Args:
+            room_code (str): The room the user is disconnecting from.
+            user_id (str): The disconnecting participant's user id.
+        """
         if room_code in self.active_connections:
             self.active_connections[room_code].pop(user_id, None)
             logger.info(
@@ -63,36 +80,68 @@ class ConnectionManager:
     async def broadcast_to_room(
         self, room_code: str, message: dict, sender_id: str | None = None
     ) -> None:
-        """Publish a message to all users in a room across all instances."""
+        """Publish a message to all users in a room across all instances.
+
+        Args:
+            room_code (str): The room to broadcast the message to.
+            message (dict): The message payload.
+            sender_id (str | None): The user ID of the sender to avoid echo, if applicable.
+        """
         payload = {"type": "broadcast", "sender_id": sender_id, "data": message}
         await self.redis.publish(self._get_channel_name(room_code), json.dumps(payload))
 
     async def send_to_user(
         self, room_code: str, target_user_id: str, message: dict
     ) -> None:
-        """Publish a message to a specific user in a room across all instances."""
+        """Publish a message to a specific user in a room across all instances.
+
+        Args:
+            room_code (str): The room containing the target.
+            target_user_id (str): The specific user to receive the message.
+            message (dict): The message payload.
+        """
         payload = {"type": "unicast", "target_user_id": target_user_id, "data": message}
         await self.redis.publish(self._get_channel_name(room_code), json.dumps(payload))
 
     # ── Internal Redis Pub/Sub Logic ─────────────────────────────────
 
     def _get_channel_name(self, room_code: str) -> str:
+        """Get the Redis channel name for a given room.
+
+        Args:
+            room_code (str): The room code.
+
+        Returns:
+            str: The corresponding channel identifier string.
+        """
         return f"ws:room:{room_code}"
 
     def _start_listening(self, room_code: str) -> None:
-        """Start a background task to listen for room messages on Redis."""
+        """Start a background task to listen for room messages on Redis.
+
+        Args:
+            room_code (str): The room code to subscribe to.
+        """
         if room_code not in self._pubsub_tasks:
             task = asyncio.create_task(self._listen_to_redis(room_code))
             self._pubsub_tasks[room_code] = task
 
     def _stop_listening(self, room_code: str) -> None:
-        """Cancel the background task listening for room messages."""
+        """Cancel the background task listening for room messages.
+
+        Args:
+            room_code (str): The room code to unsubscribe from.
+        """
         task = self._pubsub_tasks.pop(room_code, None)
         if task and not task.done():
             task.cancel()
 
     async def _listen_to_redis(self, room_code: str) -> None:  # noqa: C901
-        """Listen to a Redis channel and dispatch to local websockets."""
+        """Listen to a Redis channel and dispatch to local websockets.
+
+        Args:
+            room_code (str): The room code being monitored.
+        """
         pubsub = self.redis.pubsub()
         channel = self._get_channel_name(room_code)
         await pubsub.subscribe(channel)
@@ -149,6 +198,11 @@ _connection_manager: ConnectionManager | None = None
 
 
 def get_connection_manager() -> ConnectionManager:
+    """Retrieve the singleton instance of the ConnectionManager.
+
+    Returns:
+        ConnectionManager: The global manager instance.
+    """
     global _connection_manager  # noqa: PLW0603
     if _connection_manager is None:
         # Create it synchronously but pass the global Redis client

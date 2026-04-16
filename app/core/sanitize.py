@@ -1,3 +1,9 @@
+"""Logging sanitization module.
+
+Automatically replaces control characters and dynamically truncates values 
+to prevent log injection.
+"""
+
 import re
 from collections.abc import Iterable
 

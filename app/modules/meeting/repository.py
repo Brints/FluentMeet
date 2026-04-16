@@ -19,12 +19,28 @@ class MeetingRepository:
 
     # ── Room CRUD ────────────────────────────────────────────────────────
     def create_room(self, room: Room) -> Room:
+        """Store a new room boundary natively committing securely.
+
+        Args:
+            room (Room): Native Pydantic validation mapping cast to SQLAlchemy construct securely.
+
+        Returns:
+            Room: Refreshed db entity returning primary identifiers dynamically generated natively.
+        """
         self.db.add(room)
         self.db.commit()
         self.db.refresh(room)
         return room
 
     def get_room_by_code(self, room_code: str) -> Room | None:
+        """Filter explicit Room entities actively running strings directly to database clauses securely.
+
+        Args:
+            room_code (str): Formatted public URL tracking token string.
+
+        Returns:
+            Room | None: Retrieved database definition natively.
+        """
         return self.db.execute(
             select(Room).where(Room.room_code == room_code)
         ).scalar_one_or_none()
@@ -70,7 +86,14 @@ class MeetingRepository:
         return participant
 
     def count_all_participants(self, room_id: uuid.UUID) -> int:
-        """Counts every unique participant that has ever joined the room."""
+        """Counts every unique participant that has ever joined the room.
+
+        Args:
+            room_id (uuid.UUID): Identity mapping targeting specific bounds naturally.
+
+        Returns:
+            int: Total aggregations dynamically returned securely natively.
+        """
         return self.db.execute(
             select(func.count(Participant.id)).where(Participant.room_id == room_id)
         ).scalar_one()

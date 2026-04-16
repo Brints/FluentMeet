@@ -1,3 +1,8 @@
+"""Application core configuration module.
+
+Leverages pydantic_settings to load variables from the `.env` file securely.
+"""
+
 import pathlib
 import tomllib
 
@@ -5,6 +10,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 def get_version() -> str:
+    """Extract project version from pyproject.toml natively.
+
+    Returns:
+        str: Version string (e.g. '1.0.0').
+    """
     pyproject_path = pathlib.Path(__file__).parent.parent.parent / "pyproject.toml"
     if pyproject_path.exists():
         with pyproject_path.open("rb") as f:
@@ -14,6 +24,8 @@ def get_version() -> str:
 
 
 class Settings(BaseSettings):
+    """Core settings payload mapping dynamically to .env files."""
+
     PROJECT_NAME: str = "FluentMeet"
     VERSION: str = get_version()
     API_V1_STR: str = "/api/v1"

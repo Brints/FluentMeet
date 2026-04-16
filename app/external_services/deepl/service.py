@@ -1,4 +1,4 @@
-"""DeepL Translation service.
+"""DeepL Translation service module.
 
 Wraps the DeepL REST API (/v2/translate) for text translation.
 Falls back to OpenAI GPT-4o-mini when DeepL is unavailable or
@@ -44,7 +44,14 @@ _DEEPL_LANG_MAP: dict[str, str] = {
 
 
 class DeepLTranslationService:
-    """Stateless service for translating text via DeepL."""
+    """Stateless service for translating text via DeepL.
+
+    Provides an asynchronous native wrapper mapping to the REST API,
+    translating strings to strict target formats.
+
+    Attributes:
+        _timeout (float): Max timeout for HTTP requests mapping to DeepL.
+    """
 
     def __init__(self, timeout: float = 10.0) -> None:
         self._timeout = timeout
@@ -103,12 +110,24 @@ class DeepLTranslationService:
         }
 
     def supports_language(self, language_code: str) -> bool:
-        """Check if DeepL supports a given target language."""
+        """Check if DeepL supports a given target language.
+
+        Args:
+            language_code (str): The ISO 639-1 language string to verify.
+
+        Returns:
+            bool: True if the language is supported natively by DeepL,
+            otherwise False.
+        """
         return language_code.lower() in _DEEPL_LANG_MAP
 
 
 class OpenAITranslationFallback:
-    """Fallback translation via OpenAI GPT-4o-mini for unsupported DeepL pairs."""
+    """Fallback translation via OpenAI GPT-4o-mini for unsupported DeepL pairs.
+
+    Attributes:
+        _timeout (float): Max HTTP timeout allowance for the fallback connection.
+    """
 
     def __init__(self, timeout: float = 15.0) -> None:
         self._timeout = timeout

@@ -5,7 +5,7 @@ wraps them in an ``AudioChunkEvent``, and publishes to the ``audio.raw`` topic.
 
 The ``AudioEgressRouter`` is a Kafka consumer that reads from
 ``audio.synthesized`` and routes the synthesized audio back to the correct
-room's WebSocket connections.
+room's WebSocket connections gracefully.
 """
 
 import base64
@@ -34,14 +34,25 @@ class AudioIngestService:
         self._sequence_counters: dict[str, int] = {}
 
     def _next_sequence(self, user_key: str) -> int:
-        """Return a monotonically increasing sequence number per user."""
+        """Return a monotonically increasing sequence number per user.
+
+        Args:
+            user_key (str): The unique identifier for the user in the room.
+
+        Returns:
+            int: The next sequence number.
+        """
         current = self._sequence_counters.get(user_key, -1)
         current += 1
         self._sequence_counters[user_key] = current
         return current
 
     def reset_sequence(self, user_key: str) -> None:
-        """Reset the sequence counter when a user disconnects."""
+        """Reset the sequence counter when a user disconnects.
+
+        Args:
+            user_key (str): The unique identifier for the user to reset.
+        """
         self._sequence_counters.pop(user_key, None)
 
     async def publish_audio_chunk(
@@ -57,12 +68,12 @@ class AudioIngestService:
         """Encode and publish an audio chunk to the ``audio.raw`` topic.
 
         Args:
-            room_id: The meeting room code.
-            user_id: Speaker's tracking ID.
-            audio_bytes: Raw audio data (PCM or Opus).
-            source_language: Speaker's language code.
-            sample_rate: Audio sample rate in Hz.
-            encoding: Audio encoding format.
+            room_id (str): The meeting room code.
+            user_id (str): Speaker's tracking ID.
+            audio_bytes (bytes): Raw audio data (PCM or Opus).
+            source_language (str): Speaker's language code.
+            sample_rate (int): Audio sample rate in Hz.
+            encoding (str): Audio encoding format.
         """
         user_key = f"{room_id}:{user_id}"
         seq = self._next_sequence(user_key)
@@ -96,6 +107,11 @@ _ingest_service: AudioIngestService | None = None
 
 
 def get_audio_ingest_service() -> AudioIngestService:
+    """Retrieve the singleton instance of the AudioIngestService.
+
+    Returns:
+        AudioIngestService: The service instance.
+    """
     global _ingest_service  # noqa: PLW0603
     if _ingest_service is None:
         _ingest_service = AudioIngestService()

@@ -1,3 +1,10 @@
+"""Kafka Manager module.
+
+This module provides the central `KafkaManager` singleton responsible
+for orchestrating the lifecycles of all producers, consumers, and topics
+during the FastAPI framework startup and shutdown events.
+"""
+
 import logging
 from typing import Optional
 
@@ -11,10 +18,13 @@ logger = logging.getLogger(__name__)
 
 
 class KafkaManager:
-    """
-    Singleton manager responsible for Kafka producer and consumer lifecycles.
+    """Singleton manager responsible for Kafka lifecycle.
 
-    Usage:
+    This manager provisions required topics, initializes the global
+    Kafka producer, and starts the asynchronous tasks for all registered
+    consumers.
+
+    Example:
         manager = get_kafka_manager()
         manager.register_consumer(MyEmailConsumer())
         await manager.start()   # called from FastAPI lifespan

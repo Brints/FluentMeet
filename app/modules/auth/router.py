@@ -1,3 +1,9 @@
+"""Authentication API Router module.
+
+Registers the public FastApi routes binding external endpoints logic mapping
+securely against stateless token schemas locally.
+"""
+
 import logging
 from datetime import UTC, datetime
 from typing import cast
