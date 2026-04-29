@@ -40,9 +40,9 @@ async def get_current_user(
     """Decode an access-token JWT and return the authenticated user.
 
     Args:
-        token (str | None): OAuth2 password bearer token. 
+        token (str | None): OAuth2 password bearer token.
             Defaults to Depends(oauth2_scheme).
-        bearer (HTTPAuthorizationCredentials | None): HTTP bearer credentials. 
+        bearer (HTTPAuthorizationCredentials | None): HTTP bearer credentials.
             Defaults to Depends(bearer_scheme).
         db (Session): Database session.
         token_store (TokenStoreService): Redis-backed token store service.
@@ -130,9 +130,9 @@ async def get_current_user_optional(
     """Attempt to decode JWT and return User if present, otherwise return None.
 
     Args:
-        token (str | None): OAuth2 password bearer token. 
+        token (str | None): OAuth2 password bearer token.
             Defaults to Depends(oauth2_scheme).
-        bearer (HTTPAuthorizationCredentials | None): HTTP bearer credentials. 
+        bearer (HTTPAuthorizationCredentials | None): HTTP bearer credentials.
             Defaults to Depends(bearer_scheme).
         db (Session): Database session.
         token_store (TokenStoreService): Redis-backed token store service.

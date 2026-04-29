@@ -45,7 +45,7 @@ async def validation_exception_handler(_request: Request, exc: Any) -> JSONRespo
         exc (Any): FastApi `RequestValidationError` block.
 
     Returns:
-        JSONResponse: HTTP 400 error dynamically defining all Pydantic field 
+        JSONResponse: HTTP 400 error dynamically defining all Pydantic field
             failures natively.
     """
     details = []
@@ -92,7 +92,7 @@ async def unhandled_exception_handler(
         exc (Exception): Standard fatal Python runtime exception mapping.
 
     Returns:
-        JSONResponse: Protected HTTP 500 entity guarding system stacktraces 
+        JSONResponse: Protected HTTP 500 entity guarding system stacktraces
             from external clients statically.
     """
     logger.exception("Unhandled exception occurred: %s", sanitize_for_log(exc))
@@ -107,7 +107,7 @@ def register_exception_handlers(app: FastAPI) -> None:
     """Register all custom exception handlers to the FastAPI app.
 
     Args:
-        app (FastAPI): The main application context container natively 
+        app (FastAPI): The main application context container natively
             targeting startup hooks framework.
     """
     app.add_exception_handler(FluentMeetException, fluentmeet_exception_handler)

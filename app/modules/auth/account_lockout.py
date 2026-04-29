@@ -50,7 +50,8 @@ class AccountLockoutService:
         """Initialize the AccountLockoutService.
 
         Args:
-            redis_client (aioredis.Redis | None): Optional overriding injected Redis Async client. Defaults to None.
+            redis_client (aioredis.Redis | None): Optional overriding injected Redis
+                Async client. Defaults to None.
         """
         self._redis = redis_client or _get_redis_client()
         self._max_attempts = settings.MAX_FAILED_LOGIN_ATTEMPTS
@@ -119,7 +120,8 @@ class AccountLockoutService:
             email (str): Target user email identifier.
 
         Returns:
-            dict: Lockout status containing is_locked, lock_time_left, and attempts_remaining.
+            dict: Lockout status containing is_locked, lock_time_left,
+                and attempts_remaining.
         """
         is_locked = bool(await self._redis.exists(self._locked_key(email)))
         lock_time_left = None

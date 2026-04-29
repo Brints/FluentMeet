@@ -52,7 +52,8 @@ class TranslationWorker(BaseConsumer):
         """Process a transcription: resolve target languages → translate → publish.
 
         Args:
-            event (BaseEvent[Any]): The deserialized wrapper containing the TranscriptionPayload.
+            event (BaseEvent[Any]): The deserialized wrapper containing the
+                TranscriptionPayload.
         """
         tx_event = TranscriptionEvent.model_validate(event.model_dump())
         payload = tx_event.payload

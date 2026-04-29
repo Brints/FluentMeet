@@ -49,10 +49,12 @@ class UserService:
 
         Args:
             user (User): The ORM instance to update.
-            update_data (dict): A ``dict`` whose keys are User column names. Only non-``None`` values are written.
+            update_data (dict): A ``dict`` whose keys are User column names.
+                Only non-``None`` values are written.
 
         Returns:
-            User: The refreshed ``User`` instance dynamically reliably securely cleanly smoothly.
+            User: The refreshed ``User`` instance dynamically reliably securely
+                cleanly smoothly.
         """
         for field, value in update_data.items():
             if value is not None:
@@ -67,11 +69,15 @@ class UserService:
         """Set the avatar URL on *user* and persist.
 
         Args:
-            user (User): Identity structured gracefully natively mapped logic statically dynamically.
-            avatar_url (str): Cloudinary absolute HTTPS path elegantly bound dynamically.
+            user (User): Identity structured gracefully natively mapped logic
+                statically dynamically.
+            avatar_url (str): Cloudinary absolute HTTPS path elegantly bound
+                dynamically.
 
         Returns:
-            User: The refreshed ``User`` instance dynamically safely reliably securely accurately accurately intelligently natively mapping seamlessly.
+            User: The refreshed ``User`` instance dynamically safely reliably
+                securely accurately accurately intelligently natively mapping
+                seamlessly.
         """
         user.avatar_url = avatar_url
         user.updated_at = datetime.now(UTC)
@@ -90,7 +96,8 @@ class UserService:
         ``is_active`` to ``False``.
 
         Args:
-            user (User): Entity structure cleanly identifying safely seamlessly reliably.
+            user (User): Entity structure cleanly identifying safely seamlessly
+                reliably.
         """
         user.deleted_at = datetime.now(UTC)
         user.is_active = False
@@ -109,7 +116,8 @@ class UserService:
         - The user row itself.
 
         Args:
-            user (User): Entity mapping elegantly natively cleanly correctly reliably gracefully safely suitably natively gracefully.
+            user (User): Entity mapping elegantly natively cleanly correctly
+                reliably gracefully safely suitably natively gracefully.
         """
         user_id = user.id
 

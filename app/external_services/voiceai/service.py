@@ -49,9 +49,11 @@ class VoiceAITTSService:
 
         Args:
             text (str): The text to synthesize.
-            language (str): ISO 639-1 language code for voice selection. Defaults to "en".
+            language (str): ISO 639-1 language code for voice selection.
+            Defaults to "en".
             voice_id (str | None): Optional Voice.ai voice ID. Uses default if omitted.
-            encoding (str): Output encoding (``linear16`` or ``opus``). Defaults to "linear16".
+            encoding (str): Output encoding (``linear16`` or ``opus``).
+            Defaults to "linear16".
 
         Returns:
             dict: A dictionary containing ``audio_bytes``, ``sample_rate``,

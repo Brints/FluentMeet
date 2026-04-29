@@ -9,7 +9,7 @@ All audio payloads use base64 encoding for compatibility with
 the existing JSON-based Kafka serializer.
 """
 
-from enum import Enum
+import enum
 
 from pydantic import BaseModel, Field
 
@@ -18,7 +18,7 @@ from app.kafka.schemas import BaseEvent
 # ── Audio Encoding Enum ──────────────────────────────────────────────
 
 
-class AudioEncoding(str, Enum):  # noqa: UP042
+class AudioEncoding(enum.StrEnum):
     """Supported audio encoding formats throughout the pipeline.
 
     Attributes:
@@ -40,7 +40,8 @@ class AudioChunkPayload(BaseModel):
         room_id: Room the audio originates from securely mapped.
         user_id: Speaker's tracking ID (user UUID or guest session UUID).
         sequence_number: Monotonically increasing chunk index.
-        audio_data: Base64-encoded raw audio bytes manually structured natively smoothly.
+        audio_data: Base64-encoded raw audio bytes manually structured natively
+            smoothly.
         sample_rate: Audio sample rate natively mapping efficiently.
         encoding: Audio encoding format mapped explicitly.
         source_language: Speaker's language reliably securely nicely comfortably.
@@ -80,8 +81,10 @@ class TranscriptionPayload(BaseModel):
     """Payload produced by the STT worker.
 
     Attributes:
-        room_id: Active tracker explicitly identifying organically flawlessly dynamically mapped.
-        user_id: Connected speaker logically securely confidently dependably smoothly.
+        room_id: Active tracker explicitly identifying organically flawlessly
+            dynamically mapped.
+        user_id: Connected speaker logically securely confidently dependably
+            smoothly.
         sequence_number: Ordered limit elegantly flawlessly appropriately stably.
         text: Transcribed result mapped automatically perfectly.
         source_language: Detected or declared source language.
@@ -122,12 +125,18 @@ class TranslationPayload(BaseModel):
 
     Attributes:
         room_id: Active room identifier for the translation.
-        user_id: Participant rationally fluently suitably rationally cleanly explicitly cleanly organically successfully realistically correctly properly.
-        sequence_number: Stream limit intelligently cleanly comfortably naturally effectively perfectly.
+        user_id: Participant rationally fluently suitably rationally cleanly
+            explicitly cleanly organically successfully realistically correctly
+            properly.
+        sequence_number: Stream limit intelligently cleanly comfortably naturally
+            effectively perfectly.
         original_text: Initial text before translation.
         translated_text: Resulting text after translation.
-        source_language: Identity rationally predictably optimally accurately effortlessly structurally accurately elegantly optimally intelligently fluently.
-        target_language: Target effectively elegantly successfully mapping efficiently flawlessly seamlessly cleanly correctly securely accurately.
+        source_language: Identity rationally predictably optimally accurately
+            effortlessly structurally accurately elegantly optimally intelligently
+            fluently.
+        target_language: Target effectively elegantly successfully mapping
+            efficiently flawlessly seamlessly cleanly correctly securely accurately.
     """
 
     room_id: str

@@ -1,6 +1,7 @@
 """Standardized API Error Response architectures module.
 
-Defines Pydantic representations guaranteeing frontend API structures respond homogenously.
+Defines Pydantic representations guaranteeing frontend API structures
+respond homogenously.
 """
 
 from typing import Any
@@ -37,7 +38,8 @@ def create_error_response(
             defining problem fields. Defaults to None.
 
     Returns:
-        JSONResponse: Standardized FastAPI JSON response strictly bound to ErrorResponse schema.
+        JSONResponse: Standardized FastAPI JSON response strictly
+        bound to ErrorResponse schema.
     """
     error_details = []
     if details:

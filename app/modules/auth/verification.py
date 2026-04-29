@@ -25,7 +25,8 @@ def _to_aware_utc(value: datetime) -> datetime:
 
 
 class AuthVerificationService:
-    """Core Verification pipeline mapper resolving explicit state structures securely."""
+    """Core Verification pipeline mapper resolving explicit state structures
+    securely."""
 
     def __init__(self, db: Session, email_producer: EmailProducerService):
         self.db = db
@@ -50,10 +51,12 @@ class AuthVerificationService:
         return verification_token
 
     def verify_email(self, token: str | None) -> None:
-        """Parse native URL token variables natively unlocking Database accounts sequentially.
+        """Parse native URL token variables natively unlocking Database accounts
+        sequentially.
 
         Args:
-            token (str | None): Parsed identity validation hash automatically tracked bounds natively.
+            token (str | None): Parsed identity validation hash automatically
+                tracked bounds natively.
         """
         if token is None:
             raise BadRequestException(
@@ -98,7 +101,8 @@ class AuthVerificationService:
             raise
 
     async def resend_verification_email(self, email: str) -> None:
-        """Re-generate tokens if verification emails fail locally seamlessly dynamically.
+        """Re-generate tokens if verification emails fail locally seamlessly
+        dynamically.
 
         Args:
             email (str): Valid user Identity dynamically mapped locally securely.

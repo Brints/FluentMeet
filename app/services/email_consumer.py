@@ -38,7 +38,8 @@ class EmailTemplateRenderer:
         """Render a Jinja2 template with the given data.
 
         Args:
-            template_name (str): The name of the HTML template file (without extension).
+            template_name (str): The name of the HTML template file
+                (without extension).
             data (dict[str, object]): The context variables to inject.
 
         Returns:

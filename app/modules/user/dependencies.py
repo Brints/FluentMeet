@@ -13,7 +13,8 @@ def get_user_service(
     """Provide a ``UserService`` wired to the current request's DB session.
 
     Args:
-        db (Session): Database transaction manager natively injected. Defaults to `get_db`.
+        db (Session): Database transaction manager natively injected.
+            Defaults to `get_db`.
 
     Returns:
         UserService: Service entity bound to logic boundaries.

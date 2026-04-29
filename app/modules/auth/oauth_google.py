@@ -16,12 +16,14 @@ class OAuthProviderException(BadGatewayException):
 
 
 class GoogleOAuthService:
-    """Oauth2 Proxy wrapping OpenID Connect callbacks dynamically against Google environments.
+    """Oauth2 Proxy wrapping OpenID Connect callbacks dynamically against
+    Google environments.
 
     Attributes:
         client_id (str): Google Client ID.
         client_secret (str): Google Client Secret natively.
-        redirect_uri (str): Allowed Oauth 2.0 callback destination natively tracked securely.
+        redirect_uri (str): Allowed Oauth 2.0 callback destination natively
+            tracked securely.
     """
 
     def __init__(self, client_id: str, client_secret: str, redirect_uri: str):
@@ -36,10 +38,12 @@ class GoogleOAuthService:
         """Construct the initial redirect URL authorizing Google access.
 
         Args:
-            state (str): Unique cryptographic state proxying tokens mitigating CSRF risks.
+            state (str): Unique cryptographic state proxying tokens
+                mitigating CSRF risks.
 
         Returns:
-            str: Absolute https URI routing user browsers natively to Google Consent architectures.
+            str: Absolute https URI routing user browsers natively to
+                Google Consent architectures.
         """
         params = {
             "client_id": self.client_id,
@@ -56,7 +60,8 @@ class GoogleOAuthService:
         """Exchange the Oauth2 authorization code for a valid access_token.
 
         Args:
-            code (str): Time-sensitive exchange code provided by Google callback queries.
+            code (str): Time-sensitive exchange code provided by Google
+                callback queries.
 
         Returns:
             str: Issued OAuth Bearer Access Token.

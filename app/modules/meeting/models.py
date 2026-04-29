@@ -16,7 +16,8 @@ def utc_now() -> datetime:
 
 
 class Room(Base):
-    """Database model storing standard video-conference domains tracking lifecycle securely.
+    """Database model storing standard video-conference domains tracking
+    lifecycle securely.
 
     Attributes:
         id: Native UUID identity struct.
@@ -27,7 +28,8 @@ class Room(Base):
         scheduled_at: Optional payload struct defining constraints securely.
         created_at: Tracking identifier logic.
         ended_at: Time validation block mapped transparently natively.
-        settings: JSON array payload defining bounds dynamically (e.g., `lock_room`, `max_participants`).
+        settings: JSON array payload defining bounds dynamically (e.g.,
+            `lock_room`, `max_participants`).
     """
 
     __tablename__ = "rooms"
@@ -66,11 +68,13 @@ class Participant(Base):
         id: Primary identity tracker statically tracking interactions locally.
         room_id: FK array tracking parent Room identity natively.
         user_id: Authenticated mapping securely targeting explicit Identity arrays.
-        guest_session_id: Unauthenticated visitor string securely generating unique identity maps dynamically.
+        guest_session_id: Unauthenticated visitor string securely generating unique
+            identity maps dynamically.
         display_name: The public identifying string.
         joined_at: Date timestamp explicitly capturing states natively.
         left_at: Bounds logic natively tracked array identifiers seamlessly dynamically.
-        role: Internal target natively isolating Guest vs Host restrictions natively explicitly bounding definitions natively.
+        role: Internal target natively isolating Guest vs Host restrictions
+            natively explicitly bounding definitions natively.
     """
 
     __tablename__ = "participants"

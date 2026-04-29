@@ -22,7 +22,7 @@ async def rate_limit_exception_handler(
 
     Args:
         _request (Request): Starlette HTTP request mapping object.
-        _exc (RateLimitExceeded): Fastapi Limiter exceeded bounds exception 
+        _exc (RateLimitExceeded): Fastapi Limiter exceeded bounds exception
             tracking model.
 
     Returns:

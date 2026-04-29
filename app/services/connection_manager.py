@@ -85,7 +85,8 @@ class ConnectionManager:
         Args:
             room_code (str): The room to broadcast the message to.
             message (dict): The message payload.
-            sender_id (str | None): The user ID of the sender to avoid echo, if applicable.
+            sender_id (str | None): The user ID of the sender to avoid echo,
+                if applicable.
         """
         payload = {"type": "broadcast", "sender_id": sender_id, "data": message}
         await self.redis.publish(self._get_channel_name(room_code), json.dumps(payload))

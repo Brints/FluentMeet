@@ -42,7 +42,8 @@ class STTWorker(BaseConsumer):
         """Process a single audio chunk: decode → STT → publish transcript.
 
         Args:
-            event (BaseEvent[Any]): The deserialized wrapper containing the AudioChunkPayload.
+            event (BaseEvent[Any]): The deserialized wrapper containing the
+                AudioChunkPayload.
         """
         chunk_event = AudioChunkEvent.model_validate(event.model_dump())
         payload = chunk_event.payload

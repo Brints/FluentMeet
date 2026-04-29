@@ -52,7 +52,8 @@ class TTSWorker(BaseConsumer):
         """Process a translation: synthesize audio → publish.
 
         Args:
-            event (BaseEvent[Any]): The deserialized wrapper containing the TranslationPayload.
+            event (BaseEvent[Any]): The deserialized wrapper containing the
+                TranslationPayload.
         """
         tl_event = TranslationEvent.model_validate(event.model_dump())
         payload = tl_event.payload
@@ -116,7 +117,8 @@ class TTSWorker(BaseConsumer):
             encoding (str): The desired output audio format encoding.
 
         Returns:
-            dict: A dictionary containing 'audio_bytes' and the 'sample_rate' metadata.
+            dict: A dictionary containing 'audio_bytes' and the 'sample_rate'
+                metadata.
         """
         provider = settings.ACTIVE_TTS_PROVIDER.lower()
 

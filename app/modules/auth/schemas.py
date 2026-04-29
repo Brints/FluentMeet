@@ -1,12 +1,20 @@
 """Authentication Pydantic schemas module.
 
-Strictly defines JSON constraints validating and mutating incoming API properties automatically.
+Strictly defines JSON constraints validating and mutating incoming API properties
+automatically.
 """
 
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 from app.modules.auth.constants import SupportedLanguage
 
@@ -93,7 +101,8 @@ class SignupRequest(UserBase):
     def terms_must_be_accepted(cls, value: bool) -> bool:
         if not value:
             raise ValueError(
-                "You must accept the Terms of Service and Privacy Policy to create an account."
+                "You must accept the Terms of Service and Privacy Policy "
+                "to create an account."
             )
         return value
 

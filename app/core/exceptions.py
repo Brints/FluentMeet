@@ -12,11 +12,11 @@ class FluentMeetException(Exception):
 
     Attributes:
         status_code (int): Standard HTTP binding natively decoded by handlers.
-        code (str): Explicit mapped exception code array dynamically returned 
+        code (str): Explicit mapped exception code array dynamically returned
             to frontend structures.
-        message (str): Text definition descriptor structure readable 
+        message (str): Text definition descriptor structure readable
             explicitly by users.
-        details (list[dict[str, Any]]): Internal mappings definition blocks 
+        details (list[dict[str, Any]]): Internal mappings definition blocks
             (useful for validation outputs).
     """
 

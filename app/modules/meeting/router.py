@@ -1,5 +1,3 @@
-"""REST API endpoints for the meeting feature package."""
-
 """Meeting API Router module.
 
 Registers the public FastApi routes mapping stateless token schemas against

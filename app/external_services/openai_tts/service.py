@@ -45,8 +45,10 @@ class OpenAITTSService:
 
         Args:
             text (str): The text to synthesize.
-            voice (str | None): OpenAI voice ID (alloy, echo, fable, onyx, nova, shimmer). Defaults to None.
-            encoding (str): Output encoding (``linear16`` or ``opus``). Defaults to "linear16".
+            voice (str | None): OpenAI voice ID
+            (alloy, echo, fable, onyx, nova, shimmer). Defaults to None.
+            encoding (str): Output encoding (``linear16`` or ``opus``).
+            Defaults to "linear16".
 
         Returns:
             dict: A dictionary containing ``audio_bytes``, ``sample_rate``,

@@ -13,7 +13,8 @@ def get_meeting_repository(db: Session = Depends(get_db)) -> MeetingRepository:
     """Provide a MeetingRepository wired to the current DB session.
 
     Args:
-        db (Session): Database transaction manager natively injected. Defaults to Depends(get_db).
+        db (Session): Database transaction manager natively injected.
+            Defaults to Depends(get_db).
 
     Returns:
         MeetingRepository: Concrete repository abstraction initialized natively.
@@ -39,8 +40,10 @@ def get_meeting_service(
     """Provide the high-level business logic service.
 
     Args:
-        repo (MeetingRepository): The DB layer. Defaults to Depends(get_meeting_repository).
-        state (MeetingStateService): The Redis KV layer natively injected seamlessly. Defaults to Depends(get_meeting_state_service).
+        repo (MeetingRepository): The DB layer. Defaults to
+            Depends(get_meeting_repository).
+        state (MeetingStateService): The Redis KV layer natively injected
+            seamlessly. Defaults to Depends(get_meeting_state_service).
 
     Returns:
         MeetingService: Composed struct tracking meeting implementations securely.

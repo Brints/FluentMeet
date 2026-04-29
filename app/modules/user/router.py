@@ -229,10 +229,13 @@ def _extract_public_id(secure_url: str) -> str | None:
         https://res.cloudinary.com/demo/image/upload/v1234/fluentmeet/avatars/abc.jpg
 
     Args:
-        secure_url (str): Remote CDN tracking path safely bounded statically natively seamlessly dynamically mapped seamlessly natively.
+        secure_url (str): Remote CDN tracking path safely bounded statically
+            natively seamlessly dynamically mapped seamlessly natively.
 
     Returns:
-        str | None: Result correctly tracking bounds seamlessly accurately dynamically securely gracefully gracefully smoothly seamlessly automatically natively explicitly cleanly softly safely reliably.
+        str | None: Result correctly tracking bounds seamlessly accurately
+            dynamically securely gracefully gracefully smoothly seamlessly
+            automatically natively explicitly cleanly softly safely reliably.
     """
     try:
         # Strip the version segment and file extension.
@@ -257,7 +260,8 @@ def _extract_bearer_token(request: Request) -> str | None:
     """Pull the raw JWT from the ``Authorization: Bearer …`` header.
 
     Args:
-        request (Request): The core FastAPI payload injection gracefully intuitively automatically explicitly.
+        request (Request): The core FastAPI payload injection gracefully
+            intuitively automatically explicitly.
 
     Returns:
         str | None: Raw JWT value effectively seamlessly correctly natively.

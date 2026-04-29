@@ -6,6 +6,7 @@ Coordinates transactional databases natively orchestrating OAuth triggers dynami
 import logging
 import uuid
 from datetime import UTC, datetime, timedelta
+from typing import NoReturn
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -70,7 +71,8 @@ class AuthService:
 
         Args:
             user_in (SignupRequest): Target parameter mappings array natively.
-            frontend_base_url (str): The frontend UI router domain natively targeting Verification links.
+            frontend_base_url (str): The frontend UI router domain natively
+                targeting Verification links.
 
         Returns:
             User: Explicitly constructed account struct mapped.
@@ -121,15 +123,18 @@ class AuthService:
 
         return db_user
 
-    async def _handle_failed_login(self, email: str) -> None:
-        """Process a failed login attempt, throwing precise locked or invalid exceptions.
+    async def _handle_failed_login(self, email: str) -> NoReturn:
+        """Process a failed login attempt, throwing precise locked or
+        invalid exceptions.
 
         Args:
             email (str): Target user email identifier.
 
         Raises:
-            ForbiddenException: Configured with `ACCOUNT_LOCKED` code and `lock_time_left` metadata.
-            UnauthorizedException: Configured with `INVALID_CREDENTIALS` code and `attempts_remaining` metadata.
+            ForbiddenException: Configured with `ACCOUNT_LOCKED` code and
+                `lock_time_left` metadata.
+            UnauthorizedException: Configured with `INVALID_CREDENTIALS` code
+                and `attempts_remaining` metadata.
         """
         await self.lockout_svc.record_failed_attempt(email)
         lockout_info = await self.lockout_svc.get_lockout_info(email)
@@ -137,7 +142,10 @@ class AuthService:
         if lockout_info.get("is_locked"):
             raise ForbiddenException(
                 code="ACCOUNT_LOCKED",
-                message="Account is temporarily locked due to too many failed login attempts.",
+                message=(
+                    "Account is temporarily locked due to too many failed "
+                    "login attempts."
+                ),
                 details=[{"lock_time_left": lockout_info.get("lock_time_left")}],
             )
 
@@ -149,17 +157,22 @@ class AuthService:
         )
 
     async def login(self, payload: LoginRequest) -> tuple[LoginResponse, str, int]:
-        """Verify explicit payload credentials against databases generating state sessions securely.
+        """Verify explicit payload credentials against databases generating
+        state sessions securely.
 
         Args:
-            payload (LoginRequest): Incoming frontend request struct containing user parameters.
+            payload (LoginRequest): Incoming frontend request struct containing
+                user parameters.
 
         Returns:
-            tuple[LoginResponse, str, int]: Issued explicit token dicts, the raw RT string natively, and TTL in seconds.
+            tuple[LoginResponse, str, int]: Issued explicit token dicts, the
+                raw RT string natively, and TTL in seconds.
 
         Raises:
-            ForbiddenException: If account is locked (returns details metadata with `lock_time_left`).
-            UnauthorizedException: If email/password are incorrect (returns details metadata with `attempts_remaining`).
+            ForbiddenException: If account is locked (returns details metadata
+                with `lock_time_left`).
+            UnauthorizedException: If email/password are incorrect (returns
+                details metadata with `attempts_remaining`).
         """
         email = payload.email.lower()
 
@@ -168,7 +181,10 @@ class AuthService:
         if lockout_info.get("is_locked"):
             raise ForbiddenException(
                 code="ACCOUNT_LOCKED",
-                message="Account is temporarily locked due to too many failed login attempts.",
+                message=(
+                    "Account is temporarily locked due to too many failed "
+                    "login attempts."
+                ),
                 details=[{"lock_time_left": lockout_info.get("lock_time_left")}],
             )
 
@@ -179,7 +195,7 @@ class AuthService:
 
         # Verify password
         if not self.security_service.verify_password(
-            payload.password, user.hashed_password
+            payload.password, str(user.hashed_password)
         ):
             await self._handle_failed_login(email)
 
@@ -229,7 +245,8 @@ class AuthService:
 
         Args:
             email (str): Target email address.
-            frontend_base_url (str): The frontend UI router domain natively targeting Verification links.
+            frontend_base_url (str): The frontend UI router domain natively
+                targeting Verification links.
 
         Returns:
             None
@@ -289,7 +306,8 @@ class AuthService:
             raw_token (str): The raw refresh token.
 
         Returns:
-            tuple[RefreshTokenResponse, str, int]: The new access token, refresh token, and TTL in seconds.
+            tuple[RefreshTokenResponse, str, int]: The new access token,
+                refresh token, and TTL in seconds.
         """
         try:
             token_data = self.security_service.decode_refresh_token(raw_token)
@@ -352,7 +370,8 @@ class AuthService:
             avatar_url (str | None): The user's avatar URL.
 
         Returns:
-            tuple[LoginResponse, str, int]: The new access token, refresh token, and TTL in seconds.
+            tuple[LoginResponse, str, int]: The new access token, refresh token,
+                and TTL in seconds.
         """
         email = email.lower()
         user = self.get_user_by_email(email)
@@ -475,7 +494,7 @@ class AuthService:
         if expires_at < datetime.now(UTC):
             raise BadRequestException(
                 code="RESET_TOKEN_EXPIRED",
-                message=("Password reset token has expired. Please request a new one."),
+                message="Password reset token has expired. Please request a new one.",
             )
 
         user = self.db.execute(

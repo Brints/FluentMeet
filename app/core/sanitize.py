@@ -1,6 +1,6 @@
 """Logging sanitization module.
 
-Automatically replaces control characters and dynamically truncates values 
+Automatically replaces control characters and dynamically truncates values
 to prevent log injection.
 """
 

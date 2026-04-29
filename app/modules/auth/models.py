@@ -15,7 +15,8 @@ def utc_now() -> datetime:
 
 
 class User(Base):
-    """Database model tracking all identity, profiles, and state constructs for individuals natively.
+    """Database model tracking all identity, profiles, and state constructs
+    for individuals natively.
 
     Attributes:
         id: Primary UUID.

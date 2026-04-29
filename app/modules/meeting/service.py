@@ -1,8 +1,7 @@
-"""Business logic layer for the meeting feature package."""
-
 """Meeting core business service module.
 
-Coordinates meeting lifecycle boundaries, room configurations, and Redis state aggregations seamlessly.
+Coordinates meeting lifecycle boundaries, room configurations, and Redis state
+aggregations seamlessly.
 """
 
 import logging
@@ -68,7 +67,8 @@ def _create_guest_token(session_id: str, display_name: str) -> str:
 
 
 class MeetingService:
-    """Orchestrates room lifecycles, permissions, and integrates DB with Redis state securely natively."""
+    """Orchestrates room lifecycles, permissions, and integrates DB with Redis
+    state securely natively."""
 
     def __init__(self, repo: MeetingRepository, state: MeetingStateService) -> None:
         self.repo = repo
@@ -87,9 +87,11 @@ class MeetingService:
 
         Args:
             host (User): Profile bound identifier natively securely handling data.
-            name (str): The configuration defining room array parameter locally securely bindings.
+            name (str): The configuration defining room array parameter locally
+                securely bindings.
             room_settings (RoomSettings | None): Extra values payload natively.
-            scheduled_at (datetime | None): Native mapped datetime value efficiently natively tracking states.
+            scheduled_at (datetime | None): Native mapped datetime value efficiently
+                natively tracking states.
 
         Returns:
             Room: A DB entity naturally dynamically extracted from schema natively.
@@ -147,10 +149,12 @@ class MeetingService:
         """Fetch DB room details and merge with live Redis participant count.
 
         Args:
-            room_code (str): Dynamic mapping variable seamlessly tracked native URL bindings.
+            room_code (str): Dynamic mapping variable seamlessly tracked native
+                URL bindings.
 
         Returns:
-            Room: Synchronously injected entity tracking dynamic counts elegantly natively.
+            Room: Synchronously injected entity tracking dynamic counts elegantly
+                natively.
         """
         room = self.repo.get_room_by_code(room_code)
         if not room:

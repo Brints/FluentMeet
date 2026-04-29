@@ -34,7 +34,8 @@ class EmailProducerService:
             subject (str): Email subject.
             html_body (str | None): Raw HTML content, if pre-rendered.
             template_data (dict[str, Any]): Context variables for Jinja templating.
-            template (str): The name of the template to be used if html_body is missing.
+            template (str): The name of the template to be used if html_body
+                is missing.
         """
         payload = EmailPayload(
             to=to,

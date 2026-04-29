@@ -1,5 +1,5 @@
 """Security utilities for password hashing and JWT token management."""
-
+import logging
 from datetime import UTC, datetime, timedelta
 from typing import Any, cast
 from uuid import uuid4
@@ -10,6 +10,8 @@ from passlib.context import CryptContext
 
 from app.core.config import settings
 from app.modules.auth.schemas import RefreshTokenClaims
+
+logger = logging.getLogger(__name__)
 
 # Workaround for unmaintained passlib 1.7.4.
 # Suppresses the "error reading bcrypt version" warning on bcrypt 4.0+.
@@ -76,7 +78,8 @@ class SecurityService:
                     plain_password.encode("utf-8"),
                     hashed_password.encode("utf-8"),
                 )
-            except Exception:
+            except Exception as exc:
+                logger.error(f"Password verification error: {exc}")
                 return False
 
     # ------------------------------------------------------------------
