@@ -1,7 +1,20 @@
+"""Authentication Pydantic schemas module.
+
+Strictly defines JSON constraints validating and mutating incoming API properties
+automatically.
+"""
+
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 from app.modules.auth.constants import SupportedLanguage
 
@@ -27,6 +40,8 @@ class UserBase(BaseModel):
 
 
 class UserUpdate(BaseModel):
+    """Public payload returned by the user update endpoint."""
+
     full_name: str | None = Field(default=None, max_length=255)
     speaking_language: SupportedLanguage | None = None
     listening_language: SupportedLanguage | None = None
@@ -42,6 +57,8 @@ class UserUpdate(BaseModel):
 
 
 class UserResponse(UserBase):
+    """Public payload returned by the user endpoint."""
+
     id: uuid.UUID
     user_role: str
     is_active: bool
@@ -52,6 +69,8 @@ class UserResponse(UserBase):
 
 
 class Token(BaseModel):
+    """Public payload returned by the token endpoint."""
+
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
@@ -59,6 +78,8 @@ class Token(BaseModel):
 
 
 class TokenData(BaseModel):
+    """Validated, non-optional claims extracted from a token JWT."""
+
     email: str | None = None
     jti: str | None = None
 
@@ -72,6 +93,24 @@ class RefreshTokenClaims(BaseModel):
 
 class SignupRequest(UserBase):
     password: str = Field(..., min_length=8)
+    confirm_password: str
+    accepted_terms: bool
+
+    @field_validator("accepted_terms", mode="after")
+    @classmethod
+    def terms_must_be_accepted(cls, value: bool) -> bool:
+        if not value:
+            raise ValueError(
+                "You must accept the Terms of Service and Privacy Policy "
+                "to create an account."
+            )
+        return value
+
+    @model_validator(mode="after")
+    def check_passwords_match(self) -> "SignupRequest":
+        if self.password != self.confirm_password:
+            raise ValueError("passwords do not match")
+        return self
 
 
 class SignupResponse(UserResponse):

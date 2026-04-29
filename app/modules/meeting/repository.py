@@ -2,6 +2,7 @@
 
 import uuid
 from collections.abc import Sequence
+from typing import Any
 
 from sqlalchemy import Row, and_, case, func, or_, select
 from sqlalchemy.orm import Session
@@ -17,14 +18,52 @@ class MeetingRepository:
     def __init__(self, db: Session) -> None:
         self.db = db
 
+    def _duration_minutes_expression(self) -> Any:
+        """Build a DB-specific duration expression in minutes.
+
+        SQLite uses julianday; PostgreSQL uses epoch extraction from interval.
+        """
+        dialect_name = (
+            self.db.bind.dialect.name if self.db.bind is not None else ""
+        ).lower()
+
+        if dialect_name == "postgresql":
+            return func.round(
+                func.extract("epoch", Room.ended_at - Room.created_at) / 60.0
+            )
+
+        # Default to SQLite-compatible expression used in tests.
+        return func.round(
+            (func.julianday(Room.ended_at) - func.julianday(Room.created_at)) * 1440
+        )
+
     # ── Room CRUD ────────────────────────────────────────────────────────
     def create_room(self, room: Room) -> Room:
+        """Store a new room boundary natively committing securely.
+
+        Args:
+            room (Room): Native Pydantic validation mapping cast to SQLAlchemy
+                construct securely.
+
+        Returns:
+            Room: Refreshed db entity returning primary identifiers dynamically
+                generated natively.
+        """
         self.db.add(room)
         self.db.commit()
         self.db.refresh(room)
         return room
 
     def get_room_by_code(self, room_code: str) -> Room | None:
+        """Filter explicit Room entities actively running strings directly to database
+        clauses securely.
+
+        Args:
+            room_code (str): Formatted public URL tracking token string.
+
+        Returns:
+            Room | None: Retrieved database definition natively.
+        """
         return self.db.execute(
             select(Room).where(Room.room_code == room_code)
         ).scalar_one_or_none()
@@ -70,7 +109,14 @@ class MeetingRepository:
         return participant
 
     def count_all_participants(self, room_id: uuid.UUID) -> int:
-        """Counts every unique participant that has ever joined the room."""
+        """Counts every unique participant that has ever joined the room.
+
+        Args:
+            room_id (uuid.UUID): Identity mapping targeting specific bounds naturally.
+
+        Returns:
+            int: Total aggregations dynamically returned securely natively.
+        """
         return self.db.execute(
             select(func.count(Participant.id)).where(Participant.room_id == room_id)
         ).scalar_one()
@@ -87,6 +133,8 @@ class MeetingRepository:
         # and the role of the requesting user.
         # We join Room with Participant to see the user's
         # role in that specific room.
+        duration_minutes_expr = self._duration_minutes_expression()
+
         base_query = (
             select(
                 Room.room_code,
@@ -96,13 +144,7 @@ class MeetingRepository:
                 case(
                     (
                         Room.ended_at.isnot(None),
-                        func.round(
-                            (
-                                func.julianday(Room.ended_at)
-                                - func.julianday(Room.created_at)
-                            )
-                            * 1440
-                        ),
+                        duration_minutes_expr,
                     ),
                     else_=None,
                 ).label("duration_minutes"),

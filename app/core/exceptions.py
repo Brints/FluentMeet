@@ -1,9 +1,23 @@
+"""Application Base Exceptions module.
+
+Defines the core `FluentMeetException` structure allowing handlers to easily map
+application failures directly to standardized HTTP 400 and 500 entity wrappers natively.
+"""
+
 from typing import Any
 
 
 class FluentMeetException(Exception):
-    """
-    Base exception for all FluentMeet API errors.
+    """Base exception for all FluentMeet API errors.
+
+    Attributes:
+        status_code (int): Standard HTTP binding natively decoded by handlers.
+        code (str): Explicit mapped exception code array dynamically returned
+            to frontend structures.
+        message (str): Text definition descriptor structure readable
+            explicitly by users.
+        details (list[dict[str, Any]]): Internal mappings definition blocks
+            (useful for validation outputs).
     """
 
     def __init__(

@@ -72,9 +72,11 @@ def test_signup_success_creates_user_and_returns_public_profile(
     payload = {
         "email": "  USER@example.com  ",
         "password": "MyStr0ngP@ss!",
+        "confirm_password": "MyStr0ngP@ss!",
         "full_name": "  Ada Lovelace  ",
         "speaking_language": "en",
         "listening_language": "fr",
+        "accepted_terms": True,
     }
 
     response = client.post("/api/v1/auth/signup", json=payload)
@@ -104,7 +106,9 @@ def test_signup_duplicate_email_returns_conflict(client: TestClient) -> None:
     payload = {
         "email": "duplicate@example.com",
         "password": "MyStr0ngP@ss!",
+        "confirm_password": "MyStr0ngP@ss!",
         "full_name": "Duplicate User",
+        "accepted_terms": True,
     }
 
     first = client.post("/api/v1/auth/signup", json=payload)
@@ -126,7 +130,9 @@ def test_signup_invalid_language_uses_standard_validation_shape(
     payload = {
         "email": "user2@example.com",
         "password": "MyStr0ngP@ss!",
+        "confirm_password": "MyStr0ngP@ss!",
         "speaking_language": "zz",
+        "accepted_terms": True,
     }
 
     response = client.post("/api/v1/auth/signup", json=payload)
@@ -136,7 +142,28 @@ def test_signup_invalid_language_uses_standard_validation_shape(
     assert body["status"] == "error"
     assert body["code"] == "VALIDATION_ERROR"
     fields = [detail["field"] for detail in body["details"]]
+    fields = [detail["field"] for detail in body["details"]]
     assert "body.speaking_language" in fields
+
+
+def test_signup_password_mismatch_returns_validation_error(
+    client: TestClient,
+) -> None:
+    payload = {
+        "email": "mismatch@example.com",
+        "password": "MyStr0ngP@ss!",
+        "confirm_password": "WrongPassword!",
+        "accepted_terms": True,
+    }
+
+    response = client.post("/api/v1/auth/signup", json=payload)
+
+    assert response.status_code == 400
+    body = response.json()
+    assert body["status"] == "error"
+    assert body["code"] == "VALIDATION_ERROR"
+    fields = [detail["message"] for detail in body["details"]]
+    assert "Value error, passwords do not match" in fields
 
 
 def test_forgot_password_returns_generic_accepted_response(
@@ -166,7 +193,9 @@ def test_forgot_password_enqueues_reset_email_for_existing_user(
     signup_payload = {
         "email": "pwreset@example.com",
         "password": "MyStr0ngP@ss!",
+        "confirm_password": "MyStr0ngP@ss!",
         "full_name": "Reset User",
+        "accepted_terms": True,
     }
     signup_response = client.post("/api/v1/auth/signup", json=signup_payload)
     assert signup_response.status_code == 201
@@ -187,3 +216,42 @@ def test_forgot_password_enqueues_reset_email_for_existing_user(
 
     assert response.status_code == 200
     email_producer_mock.send_email.assert_awaited_once()
+
+
+def test_signup_rejected_when_terms_not_accepted(
+    client: TestClient,
+) -> None:
+    payload = {
+        "email": "noterms@example.com",
+        "password": "MyStr0ngP@ss!",
+        "confirm_password": "MyStr0ngP@ss!",
+        "accepted_terms": False,
+    }
+
+    response = client.post("/api/v1/auth/signup", json=payload)
+
+    assert response.status_code == 400
+    body = response.json()
+    assert body["status"] == "error"
+    assert body["code"] == "VALIDATION_ERROR"
+    messages = [detail["message"] for detail in body["details"]]
+    assert any("Terms of Service" in msg for msg in messages)
+
+
+def test_signup_rejected_when_terms_field_missing(
+    client: TestClient,
+) -> None:
+    payload = {
+        "email": "nofield@example.com",
+        "password": "MyStr0ngP@ss!",
+        "confirm_password": "MyStr0ngP@ss!",
+    }
+
+    response = client.post("/api/v1/auth/signup", json=payload)
+
+    assert response.status_code == 400
+    body = response.json()
+    assert body["status"] == "error"
+    assert body["code"] == "VALIDATION_ERROR"
+    fields = [detail["field"] for detail in body["details"]]
+    assert "body.accepted_terms" in fields

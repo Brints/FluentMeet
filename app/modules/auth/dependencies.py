@@ -1,3 +1,8 @@
+"""Authentication FastAPI Dependencies module.
+
+Defines all core module injectables avoiding circular imports seamlessly natively.
+"""
+
 from fastapi import Depends
 from sqlalchemy.orm import Session
 

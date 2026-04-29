@@ -24,7 +24,11 @@ _REDIS_CLIENT: aioredis.Redis | None = None
 
 
 def _get_redis_client() -> Redis:
-    """Return (and lazily create) a module-level async Redis client."""
+    """Return (and lazily create) a module-level async Redis client.
+
+    Returns:
+        Redis: Async mapped wrapper block securely.
+    """
     global _REDIS_CLIENT  # noqa: PLW0603
     if _REDIS_CLIENT is None:
         _REDIS_CLIENT = aioredis.Redis(
@@ -59,15 +63,34 @@ class TokenStoreService:
         return f"{self.PREFIX}:{email}:*"
 
     async def save_refresh_token(self, email: str, jti: str, ttl_seconds: int) -> None:
-        """Persist *jti* for *email* with an automatic expiry of *ttl_seconds*."""
+        """Persist *jti* for *email* with an automatic expiry of *ttl_seconds*.
+
+        Args:
+            email (str): Valid user email constraints.
+            jti (str): Tracker mapped identifier natively.
+            ttl_seconds (int): Redis mapped expiry limit securely.
+        """
         await self._redis.set(self._key(email, jti), "1", ex=ttl_seconds)
 
     async def revoke_refresh_token(self, email: str, jti: str) -> None:
-        """Remove *jti* for *email*, effectively revoking the refresh token."""
+        """Remove *jti* for *email*, effectively revoking the refresh token.
+
+        Args:
+            email (str): Native account identifier securely mappings.
+            jti (str): Stored tracker target block natively bound.
+        """
         await self._redis.delete(self._key(email, jti))
 
     async def is_refresh_token_valid(self, email: str, jti: str) -> bool:
-        """Return ``True`` if *jti* exists for *email* (not revoked/expired)."""
+        """Return ``True`` if *jti* exists for *email* (not revoked/expired).
+
+        Args:
+            email (str): Target email validation parameter natively.
+            jti (str): Evaluated identifier mapped natively.
+
+        Returns:
+            bool: True if mapped securely found, else False.
+        """
         return bool(await self._redis.exists(self._key(email, jti)))
 
     async def revoke_all_user_tokens(self, email: str) -> None:
@@ -77,6 +100,9 @@ class TokenStoreService:
         potential session-theft replay attack. Scans Redis for all keys
         matching ``refresh_token:{email}:*`` and deletes them in a single
         pipeline call.
+
+        Args:
+            email (str): User identifier mapped natively.
         """
         pattern = self._pattern(email)
         keys_to_delete: list[str] = []
@@ -114,12 +140,23 @@ class TokenStoreService:
 
         Called during account deletion / forced logout to prevent the
         already-issued JWT from being used again.
+
+        Args:
+            jti (str): Parsed natively extracted JTI block automatically.
+            ttl_seconds (int): Bound duration tracked via Redis securely.
         """
         if ttl_seconds > 0:
             await self._redis.set(self._blacklist_key(jti), "1", ex=ttl_seconds)
 
     async def is_access_token_blacklisted(self, jti: str) -> bool:
-        """Return ``True`` if the access-token JTI has been blacklisted."""
+        """Return ``True`` if the access-token JTI has been blacklisted.
+
+        Args:
+            jti (str): JTI payload natively verified block.
+
+        Returns:
+            bool: Native verification constraint returned correctly mapping.
+        """
         return bool(await self._redis.exists(self._blacklist_key(jti)))
 
 

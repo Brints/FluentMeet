@@ -1,6 +1,12 @@
+"""Authentication core business service module.
+
+Coordinates transactional databases natively orchestrating OAuth triggers dynamically.
+"""
+
 import logging
 import uuid
 from datetime import UTC, datetime, timedelta
+from typing import NoReturn
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -30,6 +36,8 @@ logger = logging.getLogger(__name__)
 
 
 class AuthService:
+    """Core Authentication pipeline mapper resolving explicit state structures."""
+
     def __init__(
         self,
         db: Session,
@@ -47,10 +55,28 @@ class AuthService:
         self.token_store = token_store
 
     def get_user_by_email(self, email: str) -> User | None:
+        """Query User explicitly targeting lowercased email bindings constraints.
+
+        Args:
+            email (str): Target search payload.
+
+        Returns:
+            User | None: Retrieved structure natively.
+        """
         statement = select(User).where(User.email == email.lower())
         return self.db.execute(statement).scalar_one_or_none()
 
     async def signup(self, user_in: SignupRequest, frontend_base_url: str) -> User:
+        """Register a new native participant.
+
+        Args:
+            user_in (SignupRequest): Target parameter mappings array natively.
+            frontend_base_url (str): The frontend UI router domain natively
+                targeting Verification links.
+
+        Returns:
+            User: Explicitly constructed account struct mapped.
+        """
         existing_user = self.get_user_by_email(user_in.email)
         if existing_user:
             raise ConflictException(
@@ -97,37 +123,81 @@ class AuthService:
 
         return db_user
 
-    async def login(self, payload: LoginRequest) -> tuple[LoginResponse, str, int]:
-        email = payload.email.lower()
+    async def _handle_failed_login(self, email: str) -> NoReturn:
+        """Process a failed login attempt, throwing precise locked or
+        invalid exceptions.
 
-        # Check lockout
-        if await self.lockout_svc.is_locked(email):
+        Args:
+            email (str): Target user email identifier.
+
+        Raises:
+            ForbiddenException: Configured with `ACCOUNT_LOCKED` code and
+                `lock_time_left` metadata.
+            UnauthorizedException: Configured with `INVALID_CREDENTIALS` code
+                and `attempts_remaining` metadata.
+        """
+        await self.lockout_svc.record_failed_attempt(email)
+        lockout_info = await self.lockout_svc.get_lockout_info(email)
+
+        if lockout_info.get("is_locked"):
             raise ForbiddenException(
                 code="ACCOUNT_LOCKED",
                 message=(
                     "Account is temporarily locked due to too many failed "
-                    "login attempts. Please try again later."
+                    "login attempts."
                 ),
+                details=[{"lock_time_left": lockout_info.get("lock_time_left")}],
+            )
+
+        attempts = lockout_info.get("attempts_remaining", 0)
+        raise UnauthorizedException(
+            code="INVALID_CREDENTIALS",
+            message="Invalid email or password.",
+            details=[{"attempts_remaining": attempts}],
+        )
+
+    async def login(self, payload: LoginRequest) -> tuple[LoginResponse, str, int]:
+        """Verify explicit payload credentials against databases generating
+        state sessions securely.
+
+        Args:
+            payload (LoginRequest): Incoming frontend request struct containing
+                user parameters.
+
+        Returns:
+            tuple[LoginResponse, str, int]: Issued explicit token dicts, the
+                raw RT string natively, and TTL in seconds.
+
+        Raises:
+            ForbiddenException: If account is locked (returns details metadata
+                with `lock_time_left`).
+            UnauthorizedException: If email/password are incorrect (returns
+                details metadata with `attempts_remaining`).
+        """
+        email = payload.email.lower()
+
+        # Check lockout
+        lockout_info = await self.lockout_svc.get_lockout_info(email)
+        if lockout_info.get("is_locked"):
+            raise ForbiddenException(
+                code="ACCOUNT_LOCKED",
+                message=(
+                    "Account is temporarily locked due to too many failed "
+                    "login attempts."
+                ),
+                details=[{"lock_time_left": lockout_info.get("lock_time_left")}],
             )
 
         # Lookup user
         user = self.get_user_by_email(email)
         if user is None:
-            await self.lockout_svc.record_failed_attempt(email)
-            raise UnauthorizedException(
-                code="INVALID_CREDENTIALS",
-                message="Invalid email or password.",
-            )
+            await self._handle_failed_login(email)
 
         # Verify password
         if not self.security_service.verify_password(
-            payload.password, user.hashed_password
+            payload.password, str(user.hashed_password)
         ):
-            await self.lockout_svc.record_failed_attempt(email)
-            raise UnauthorizedException(
-                code="INVALID_CREDENTIALS",
-                message="Invalid email or password.",
-            )
+            await self._handle_failed_login(email)
 
         # Guard: email verified?
         if not user.is_verified:
@@ -171,6 +241,16 @@ class AuthService:
         return login_response, refresh_token, refresh_ttl
 
     async def forgot_password(self, email: str, frontend_base_url: str) -> None:
+        """Handle forgot password request.
+
+        Args:
+            email (str): Target email address.
+            frontend_base_url (str): The frontend UI router domain natively
+                targeting Verification links.
+
+        Returns:
+            None
+        """
         user = self.get_user_by_email(email)
         if (
             not user
@@ -220,6 +300,15 @@ class AuthService:
     async def refresh_token(
         self, raw_token: str
     ) -> tuple[RefreshTokenResponse, str, int]:
+        """Handle token refresh request.
+
+        Args:
+            raw_token (str): The raw refresh token.
+
+        Returns:
+            tuple[RefreshTokenResponse, str, int]: The new access token,
+                refresh token, and TTL in seconds.
+        """
         try:
             token_data = self.security_service.decode_refresh_token(raw_token)
         except ValueError as exc:
@@ -272,6 +361,18 @@ class AuthService:
     async def resolve_oauth_user(
         self, email: str, google_id: str, name: str | None, avatar_url: str | None
     ) -> tuple[LoginResponse, str, int]:
+        """Handle OAuth user resolution.
+
+        Args:
+            email (str): Target email address.
+            google_id (str): The Google ID.
+            name (str | None): The user's name.
+            avatar_url (str | None): The user's avatar URL.
+
+        Returns:
+            tuple[LoginResponse, str, int]: The new access token, refresh token,
+                and TTL in seconds.
+        """
         email = email.lower()
         user = self.get_user_by_email(email)
 
@@ -366,7 +467,15 @@ class AuthService:
     # ------------------------------------------------------------------
 
     async def reset_password(self, token: str, new_password: str) -> None:
-        """Validate a password-reset token and apply the new password."""
+        """Validate a password-reset token and apply the new password.
+
+        Args:
+            token (str): The password reset token.
+            new_password (str): The new password.
+
+        Returns:
+            None
+        """
         reset_token = self.db.execute(
             select(PasswordResetToken).where(PasswordResetToken.token == token)
         ).scalar_one_or_none()
@@ -385,7 +494,7 @@ class AuthService:
         if expires_at < datetime.now(UTC):
             raise BadRequestException(
                 code="RESET_TOKEN_EXPIRED",
-                message=("Password reset token has expired. Please request a new one."),
+                message="Password reset token has expired. Please request a new one.",
             )
 
         user = self.db.execute(
@@ -448,7 +557,16 @@ class AuthService:
     async def change_password(
         self, user: User, current_password: str, new_password: str
     ) -> None:
-        """Change the password for an authenticated user."""
+        """Change the password for an authenticated user.
+
+        Args:
+            user (User): The authenticated user.
+            current_password (str): The current password.
+            new_password (str): The new password.
+
+        Returns:
+            None
+        """
         if not self.security_service.verify_password(
             current_password, user.hashed_password
         ):

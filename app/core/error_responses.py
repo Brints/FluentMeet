@@ -1,3 +1,9 @@
+"""Standardized API Error Response architectures module.
+
+Defines Pydantic representations guaranteeing frontend API structures
+respond homogenously.
+"""
+
 from typing import Any
 
 from fastapi.responses import JSONResponse
@@ -13,7 +19,7 @@ class ErrorResponse(BaseModel):
     status: str = "error"
     code: str
     message: str
-    details: list[ErrorDetail] = []
+    details: list[Any] = []
 
 
 def create_error_response(
@@ -22,20 +28,33 @@ def create_error_response(
     message: str,
     details: list[dict[str, Any]] | None = None,
 ) -> JSONResponse:
-    """
-    Helper to create a standardized JSON error response.
+    """Helper to create a standardized JSON error response.
+
+    Args:
+        status_code (int): HTTP status code targeting fastAPI.
+        code (str): Application specific string error code identifier.
+        message (str): Human-readable exception descriptor.
+        details (list[dict[str, Any]] | None): Additional list of error dictionaries
+            defining problem fields. Defaults to None.
+
+    Returns:
+        JSONResponse: Standardized FastAPI JSON response strictly
+        bound to ErrorResponse schema.
     """
     error_details = []
     if details:
         for detail in details:
-            error_details.append(
-                ErrorDetail(
-                    field=detail.get("field"),
-                    message=detail.get("msg")
-                    or detail.get("message")
-                    or "Unknown error",
+            if "msg" in detail and "field" in detail:
+                # Map FastApi Validation Errors explicitly
+                error_details.append(
+                    {
+                        "field": detail.get("field"),
+                        "message": detail.get("msg") or "Validation error",
+                    }
                 )
-            )
+            else:
+                # Preserve standard custom metadata cleanly
+                error_details.append(detail)
 
     response_content = ErrorResponse(
         status="error",

@@ -27,6 +27,11 @@ class STTWorker(BaseConsumer):
 
     Subscribes to ``audio.raw`` and publishes ``TranscriptionEvent``
     messages to ``text.original``.
+
+    Attributes:
+        topic: The Kafka topic for incoming raw audio chunks.
+        group_id: Consumer group identifier for STT processing.
+        event_schema: Pydantic schema used to validate incoming chunks.
     """
 
     topic = AUDIO_RAW
@@ -34,7 +39,12 @@ class STTWorker(BaseConsumer):
     event_schema = AudioChunkEvent
 
     async def handle(self, event: BaseEvent[Any]) -> None:
-        """Process a single audio chunk: decode → STT → publish transcript."""
+        """Process a single audio chunk: decode → STT → publish transcript.
+
+        Args:
+            event (BaseEvent[Any]): The deserialized wrapper containing the
+                AudioChunkPayload.
+        """
         chunk_event = AudioChunkEvent.model_validate(event.model_dump())
         payload = chunk_event.payload
 
