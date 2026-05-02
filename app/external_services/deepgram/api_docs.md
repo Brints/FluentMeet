@@ -28,7 +28,7 @@ This package exposes a single class `DeepgramSTTService` bound as a Singleton.
 It is actively injected and utilized globally by the `STTWorker` consumer daemon listening to Kafka `audio.raw`.
 
 ### Execution Flow
-1. Receives base64-decoded PCM strings.
+1. Receives raw PCM audio as a `bytes` object (base64 decoding, if needed, is handled by the caller).
 2. Injects required API metadata mapping to settings boundaries.
 3. Fires the `POST` request out asynchronously to the web REST Endpoint returning results.
 

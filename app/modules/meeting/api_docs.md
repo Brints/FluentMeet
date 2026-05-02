@@ -1,6 +1,6 @@
 # FluentMeet Meeting API Documentation
 
-> **Base URL:** `/api/v1/meetings` (Assuming router prefix, though undefined in `router.py`, wait let me check `main.py` or just document the endpoints as defined, usually it's `/api/v1/meetings`).
+> **Base URL:** `/api/v1/meetings`
 > **Version:** 1.0 · **Protocol:** REST over HTTPS & WebSockets · **Content-Type:** `application/json`
 
 ---

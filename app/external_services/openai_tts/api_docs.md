@@ -45,7 +45,7 @@ Executes the API request to retrieve the generated Audio chunk.
     Returns a strict `dict` containing the binary footprint needed to transmit over Kafka natively.
     ```json
     {
-      "audio_bytes": "base64-encoded-audio-bytes",
+      "audio_bytes": "<raw binary bytes>",
       "sample_rate": 24000,
       "latency_ms": 284.1
     }

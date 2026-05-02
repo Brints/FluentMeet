@@ -139,6 +139,11 @@ async def audio_websocket(  # noqa: C901
         except RuntimeError as exc:
             # Starlette raises RuntimeError once the disconnect frame has been
             # consumed. Treat it the same as a clean disconnect.
+            if (
+                "disconnect" not in str(exc).lower()
+                and "websocket" not in str(exc).lower()
+            ):
+                raise
             logger.info(
                 "Audio WS ingest RuntimeError (socket already closed) for %s: %s",
                 log_sanitizer.sanitize(user_id),
