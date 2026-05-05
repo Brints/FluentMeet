@@ -35,7 +35,14 @@ class MeetingStateService:
     # ── Participant Presence Hash ────────────────────────────────────────
 
     async def add_participant(
-        self, room_code: str, user_id: str, language: str, hardware_ready: bool = True
+        self,
+        room_code: str,
+        user_id: str,
+        language: str,
+        speaking_language: str = "en",
+        hardware_ready: bool = True,
+        display_name: str = "",
+        role: str = "guest",
     ) -> None:
         """Add or update a user's presence in the active room participants hash.
 
@@ -54,7 +61,10 @@ class MeetingStateService:
         state = {
             "status": "connected",
             "language": language,
+            "speaking_language": speaking_language,
             "hardware_ready": hardware_ready,
+            "display_name": display_name,
+            "role": role,
         }
         await cast(
             "Awaitable[Any]",

@@ -49,7 +49,7 @@ async def signaling_websocket(
         user_id (str): Extracted authenticated bounds safely cleanly reliably smoothly.
     """
     try:
-        await assert_room_participant(room_code, user_id)
+        participant_state = await assert_room_participant(room_code, user_id)
     except Exception as e:
         await websocket.close(code=1008, reason=str(e))
         return
@@ -58,6 +58,21 @@ async def signaling_websocket(
 
     manager = get_connection_manager()
     await manager.connect(room_code, user_id, websocket)
+
+    # Announce this peer to everyone already in the room so the participant
+    # panel updates immediately without waiting for WebRTC negotiation.
+    display_name = participant_state.get("display_name", "")
+    role = participant_state.get("role", "guest")
+    await manager.broadcast_to_room(
+        room_code,
+        {
+            "type": "user_joined",
+            "user_id": user_id,
+            "display_name": display_name,
+            "role": role,
+        },
+        sender_id=user_id,  # Don't echo back to the joiner themselves
+    )
 
     try:
         while True:
@@ -78,9 +93,9 @@ async def signaling_websocket(
 
     except WebSocketDisconnect:
         manager.disconnect(room_code, user_id)
-        # Notify others that this peer left
+        # Notify others that this peer left (use user_left to match frontend model)
         await manager.broadcast_to_room(
-            room_code, {"type": "peer_left", "user_id": user_id}, sender_id=user_id
+            room_code, {"type": "user_left", "user_id": user_id}, sender_id=user_id
         )
 
 
@@ -122,6 +137,12 @@ async def audio_websocket(  # noqa: C901
         try:
             while True:
                 message = await websocket.receive()
+                if message.get("type") == "websocket.disconnect":
+                    logger.info(
+                        "Audio WS ingest got disconnect frame for %s",
+                        log_sanitizer.sanitize(user_id),
+                    )
+                    break
                 if message.get("text"):
                     try:
                         data = base64.b64decode(message["text"])
@@ -148,7 +169,21 @@ async def audio_websocket(  # noqa: C901
                     )
         except WebSocketDisconnect:
             logger.info(
-                "Audio WS client disconnected: %s", log_sanitizer.sanitize(user_id)
+                "Audio WS client disconnected (WebSocketDisconnect): %s",
+                log_sanitizer.sanitize(user_id),
+            )
+        except RuntimeError as exc:
+            # Starlette raises RuntimeError once the disconnect frame has been
+            # consumed. Treat it the same as a clean disconnect.
+            if (
+                "disconnect" not in str(exc).lower()
+                and "websocket" not in str(exc).lower()
+            ):
+                raise
+            logger.info(
+                "Audio WS ingest RuntimeError (socket already closed) for %s: %s",
+                log_sanitizer.sanitize(user_id),
+                exc,
             )
 
     # --- Shared event so egress consumer is ready before we start ingesting ---

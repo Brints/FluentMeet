@@ -144,7 +144,13 @@ class MeetingRepository:
                 case(
                     (
                         Room.ended_at.isnot(None),
-                        duration_minutes_expr,
+                        func.round(
+                            func.extract(
+                                "epoch",
+                                Room.ended_at - Room.created_at,
+                            )
+                            / 60
+                        ),
                     ),
                     else_=None,
                 ).label("duration_minutes"),

@@ -29,6 +29,12 @@ async def fluentmeet_exception_handler(_request: Request, exc: Any) -> JSONRespo
     Returns:
         JSONResponse: An ErrorResponse mapping to `exc.status_code`.
     """
+    logger.error(
+        f"FluentMeetException: "
+        f"{sanitize_for_log(exc.status_code)} "
+        f"{sanitize_for_log(exc.code)} - "
+        f"{sanitize_for_log(exc.message)}"
+    )
     return create_error_response(
         status_code=exc.status_code,
         code=exc.code,
@@ -57,6 +63,7 @@ async def validation_exception_handler(_request: Request, exc: Any) -> JSONRespo
             }
         )
 
+    logger.error(f"Validation Error: {sanitize_for_log(details)}")
     return create_error_response(
         status_code=400,
         code="VALIDATION_ERROR",

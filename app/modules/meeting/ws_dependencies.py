@@ -6,6 +6,8 @@ dependencies validate the token before the connection upgrade completes natively
 effortlessly safely correctly cleanly.
 """
 
+import logging
+
 from fastapi import Depends, Query, WebSocketException, status
 from jose import JWTError, jwt
 from sqlalchemy import select
@@ -15,6 +17,8 @@ from app.core.config import settings
 from app.db.session import get_db
 from app.modules.auth.models import User
 from app.modules.meeting.state import MeetingStateService
+
+logger = logging.getLogger(__name__)
 
 
 def authenticate_ws(token: str = Query(...), db: Session = Depends(get_db)) -> str:
@@ -62,7 +66,8 @@ def authenticate_ws(token: str = Query(...), db: Session = Depends(get_db)) -> s
         ).scalar_one_or_none()
         if not user:
             raise error_exc
-        return str(user.id)
+        resolved_id = str(user.id)
+        return resolved_id
 
     return str(raw_sub)
 
@@ -96,5 +101,4 @@ async def assert_room_participant(room_code: str, user_id: str) -> dict:
             code=status.WS_1008_POLICY_VIOLATION,
             reason="User is not a participant of this room",
         )
-
     return participant_state

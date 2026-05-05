@@ -16,6 +16,11 @@ from app.db.session import SessionLocal, get_engine
 from app.kafka.manager import get_kafka_manager
 from app.routers import api_router
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    force=True,
+)
 logger = logging.getLogger(__name__)
 
 
@@ -56,7 +61,10 @@ app = FastAPI(
 # Set all CORS enabled origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Adjust in production
+    allow_origins=[
+        "https://spoken-frontend.onrender.com",
+        "http://localhost:4200",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
