@@ -65,6 +65,8 @@ def _create_unverified_user(client: TestClient, email: str) -> None:
     payload = {
         "email": email,
         "password": "MyStr0ngP@ss!",
+        "confirm_password": "MyStr0ngP@ss!",
+        "accepted_terms": True,
         "full_name": "Email Verify",
     }
     response = client.post("/api/v1/auth/signup", json=payload)

@@ -1,3 +1,5 @@
+"""Authentication Database Models module."""
+
 import uuid
 from datetime import UTC, datetime, timedelta
 
@@ -13,6 +15,18 @@ def utc_now() -> datetime:
 
 
 class User(Base):
+    """Database model tracking all identity, profiles, and state constructs
+    for individuals natively.
+
+    Attributes:
+        id: Primary UUID.
+        email: Unique user email address identifying accounts.
+        hashed_password: Encrypted payload statically parsed securely.
+        full_name: Standardized user provided string.
+        is_active: Activation mapping bounding sessions dynamically.
+        is_verified: Identity validation marker defining login allowance.
+    """
+
     __tablename__ = "users"
 
     id: Mapped[uuid.UUID] = mapped_column(

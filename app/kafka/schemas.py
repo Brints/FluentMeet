@@ -1,3 +1,9 @@
+"""Kafka event schemas.
+
+Defines the Pydantic data transfer objects used for serializing and
+deserializing event payloads over the Kafka broker.
+"""
+
 import uuid
 from datetime import UTC, datetime
 from typing import Any, Generic, TypeVar

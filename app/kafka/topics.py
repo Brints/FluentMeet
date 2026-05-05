@@ -1,3 +1,9 @@
+"""Kafka topic constants.
+
+This module defines the topic strings used across the application for
+producers and consumers.
+"""
+
 from typing import Final
 
 # Email notification topics

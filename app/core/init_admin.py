@@ -1,3 +1,8 @@
+"""Initialization module for default system admin user.
+
+Triggers an automatic account creation using environment variables.
+"""
+
 import logging
 
 from sqlalchemy import select
@@ -12,6 +17,11 @@ logger = logging.getLogger(__name__)
 
 
 def init_admin(db: Session) -> None:
+    """Initialize a default admin account on server startup natively.
+
+    Args:
+        db (Session): Database transaction session.
+    """
     if not settings.ADMIN_EMAIL or not settings.ADMIN_PASSWORD:
         logger.info(
             "Admin credentials not fully set in .env, skipping admin initialization."

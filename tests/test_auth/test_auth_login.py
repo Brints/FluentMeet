@@ -61,6 +61,9 @@ class FakeRedis:
         self._store[key] = str(current)
         return current
 
+    async def ttl(self, key: str) -> int:
+        return 86400 if key in self._store else -2
+
     async def scan(
         self,
         cursor: int,  # noqa: ARG002
@@ -294,7 +297,7 @@ class TestLoginInvalidCredentials:
             "status": "error",
             "code": "INVALID_CREDENTIALS",
             "message": "Invalid email or password.",
-            "details": [],
+            "details": [{"attempts_remaining": 4}],
         }
 
     def test_nonexistent_email_returns_401(self, client: TestClient) -> None:
@@ -411,6 +414,11 @@ class TestLoginAccountLockout:
 
         assert response.status_code == 403
         assert response.json()["code"] == "ACCOUNT_LOCKED"
+        assert (
+            response.json()["message"]
+            == "Account is temporarily locked due to too many failed login attempts."
+        )
+        assert response.json()["details"] == [{"lock_time_left": "1 day"}]
 
     def test_successful_login_resets_counter(
         self,

@@ -1,3 +1,9 @@
+"""Kafka Producer module.
+
+This module provides a wrapper around AIOKafkaProducer to handle robust
+asynchronous message publishing and automatic schema serialization.
+"""
+
 import json
 import logging
 from typing import Any
@@ -13,8 +19,10 @@ logger = logging.getLogger(__name__)
 
 
 class KafkaProducer:
-    """
-    Wrapper around AIOKafkaProducer with Pydantic serialization.
+    """Wrapper around AIOKafkaProducer with Pydantic serialization.
+
+    Provides high-level methods to serialize and publish `BaseEvent`
+    payloads directly into Kafka topics.
     """
 
     def __init__(self, bootstrap_servers: str):

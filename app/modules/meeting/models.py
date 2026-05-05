@@ -1,3 +1,5 @@
+"""Meeting Database Models module."""
+
 import uuid
 from datetime import UTC, datetime
 from typing import Any
@@ -14,6 +16,22 @@ def utc_now() -> datetime:
 
 
 class Room(Base):
+    """Database model storing standard video-conference domains tracking
+    lifecycle securely.
+
+    Attributes:
+        id: Native UUID identity struct.
+        room_code: Statically allocated human readable string (e.g., `xyz-qwer-vtx`).
+        host_id: Foreign key struct tracking origin creator UUID reliably.
+        name: Name string locally bound.
+        status: Enum string mapped to RoomStatus variants.
+        scheduled_at: Optional payload struct defining constraints securely.
+        created_at: Tracking identifier logic.
+        ended_at: Time validation block mapped transparently natively.
+        settings: JSON array payload defining bounds dynamically (e.g.,
+            `lock_room`, `max_participants`).
+    """
+
     __tablename__ = "rooms"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -44,6 +62,21 @@ class Room(Base):
 
 
 class Participant(Base):
+    """Database model mapping User connections locally inside discrete Rooms.
+
+    Attributes:
+        id: Primary identity tracker statically tracking interactions locally.
+        room_id: FK array tracking parent Room identity natively.
+        user_id: Authenticated mapping securely targeting explicit Identity arrays.
+        guest_session_id: Unauthenticated visitor string securely generating unique
+            identity maps dynamically.
+        display_name: The public identifying string.
+        joined_at: Date timestamp explicitly capturing states natively.
+        left_at: Bounds logic natively tracked array identifiers seamlessly dynamically.
+        role: Internal target natively isolating Guest vs Host restrictions
+            natively explicitly bounding definitions natively.
+    """
+
     __tablename__ = "participants"
 
     id: Mapped[uuid.UUID] = mapped_column(

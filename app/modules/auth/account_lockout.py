@@ -47,6 +47,12 @@ class AccountLockoutService:
     LOCKED_PREFIX = "account_locked"
 
     def __init__(self, redis_client: aioredis.Redis | None = None) -> None:
+        """Initialize the AccountLockoutService.
+
+        Args:
+            redis_client (aioredis.Redis | None): Optional overriding injected Redis
+                Async client. Defaults to None.
+        """
         self._redis = redis_client or _get_redis_client()
         self._max_attempts = settings.MAX_FAILED_LOGIN_ATTEMPTS
         self._lockout_ttl = settings.ACCOUNT_LOCKOUT_DAYS * 86400
@@ -66,11 +72,22 @@ class AccountLockoutService:
     # ------------------------------------------------------------------
 
     async def is_locked(self, email: str) -> bool:
-        """Return ``True`` if the account for *email* is currently locked."""
+        """Return ``True`` if the account for *email* is currently locked.
+
+        Args:
+            email (str): Target user email identifier.
+
+        Returns:
+            bool: True if account is locked, False otherwise.
+        """
         return bool(await self._redis.exists(self._locked_key(email)))
 
     async def record_failed_attempt(self, email: str) -> None:
-        """Increment the failure counter and lock the account if threshold reached."""
+        """Increment the failure counter and lock the account if threshold reached.
+
+        Args:
+            email (str): Target user email identifier mapping tracking block.
+        """
         attempts_key = self._attempts_key(email)
         count = await self._redis.incr(attempts_key)
 
@@ -89,8 +106,66 @@ class AccountLockoutService:
             )
 
     async def reset_attempts(self, email: str) -> None:
-        """Clear the failure counter (called on successful login)."""
+        """Clear the failure counter (called on successful login).
+
+        Args:
+            email (str): Target user email explicitly tracking lockouts locally.
+        """
         await self._redis.delete(self._attempts_key(email))
+
+    async def get_lockout_info(self, email: str) -> dict:
+        """Fetch precise lockout metadata indicating limits and remaining time.
+
+        Args:
+            email (str): Target user email identifier.
+
+        Returns:
+            dict: Lockout status containing is_locked, lock_time_left,
+                and attempts_remaining.
+        """
+        is_locked = bool(await self._redis.exists(self._locked_key(email)))
+        lock_time_left = None
+        if is_locked:
+            ttl_secs = await self._redis.ttl(self._locked_key(email))
+            if ttl_secs > 0:
+                lock_time_left = self._format_duration(ttl_secs)
+
+        attempts_bytes = await self._redis.get(self._attempts_key(email))
+        attempts = int(attempts_bytes) if attempts_bytes else 0
+        attempts_remaining = max(0, self._max_attempts - attempts)
+
+        return {
+            "is_locked": is_locked,
+            "lock_time_left": lock_time_left,
+            "attempts_remaining": attempts_remaining,
+        }
+
+    def _format_duration(self, seconds: int) -> str:
+        """Format an integer TTL into a precise human-readable duration."""
+        if seconds <= 0:
+            return "0 seconds"
+
+        days, remainder = divmod(seconds, 86400)
+        hours, remainder = divmod(remainder, 3600)
+        minutes, seconds_remaining = divmod(remainder, 60)
+
+        parts = []
+        if days:
+            parts.append(f"{days} day{'s' if days > 1 else ''}")
+        if hours:
+            parts.append(f"{hours} hour{'s' if hours > 1 else ''}")
+        if minutes:
+            parts.append(f"{minutes} minute{'s' if minutes > 1 else ''}")
+
+        if not parts:
+            parts.append(
+                f"{seconds_remaining} second{'s' if seconds_remaining > 1 else ''}"
+            )
+
+        if len(parts) == 1:
+            return parts[0]
+        else:
+            return f"{', '.join(parts[:-1])} and {parts[-1]}"
 
 
 # Module-level singleton -----------------------------------------------

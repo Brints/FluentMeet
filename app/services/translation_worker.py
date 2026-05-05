@@ -33,6 +33,11 @@ class TranslationWorker(BaseConsumer):
     Subscribes to ``text.original`` and publishes ``TranslationEvent``
     messages to ``text.translated`` — one per unique target language
     needed in the room.
+
+    Attributes:
+        topic: The Kafka topic for incoming transcription events.
+        group_id: Consumer group identifier for translation.
+        event_schema: Pydantic schema used to validate transcription events.
     """
 
     topic = TEXT_ORIGINAL
@@ -44,7 +49,12 @@ class TranslationWorker(BaseConsumer):
         self._state = MeetingStateService()
 
     async def handle(self, event: BaseEvent[Any]) -> None:
-        """Process a transcription: resolve target languages → translate → publish."""
+        """Process a transcription: resolve target languages → translate → publish.
+
+        Args:
+            event (BaseEvent[Any]): The deserialized wrapper containing the
+                TranscriptionPayload.
+        """
         tx_event = TranscriptionEvent.model_validate(event.model_dump())
         payload = tx_event.payload
 
@@ -137,7 +147,13 @@ class TranslationWorker(BaseConsumer):
     ) -> str:
         """Dispatch translation to DeepL, OpenAI fallback, or mock.
 
-        Returns the translated text string, or empty string on failure.
+        Args:
+            text (str): The original text string to be translated.
+            source_language (str): The source language code (e.g., 'en', 'es').
+            target_language (str): The destination language code.
+
+        Returns:
+            str: The translated text string, or an empty string on failure.
         """
         from app.core.config import settings
 

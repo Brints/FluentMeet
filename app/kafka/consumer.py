@@ -1,3 +1,10 @@
+"""Kafka Consumer module.
+
+Provides the `BaseConsumer` abstract class containing the core logic for
+safely consuming messages from Kafka broker topics, executing linear
+backoff retries, and forwarding poison pills to dead-letter queues.
+"""
+
 import abc
 import asyncio
 import contextlib
@@ -16,19 +23,17 @@ logger = logging.getLogger(__name__)
 
 
 class BaseConsumer(abc.ABC):
-    """
-    Abstract base class for all Kafka consumers.
+    """Abstract base class for all Kafka consumers.
 
-    Subclasses must declare class-level attributes:
-        topic: str          — the Kafka topic to subscribe to
-        group_id: str       — the consumer group identifier
-        event_schema: Type  — the Pydantic BaseEvent subclass for deserialization
+    This class enforces a standard structure for all Kafka consumer
+    workers. It handles the underlying asynchronous consumer loop,
+    manual offset committing, linear retry backoffs, and dead-letter
+    queue (DLQ) propagation.
 
-    Features:
-        - Manual offset commits (offsets only committed after successful handle())
-        - Configurable linear backoff retry with KAFKA_MAX_RETRIES
-        - Dead-letter queue (DLQ) forwarding via a proper DLQEvent wrapper
-        - Graceful shutdown via asyncio.Task cancellation
+    Attributes:
+        topic: The Kafka topic to subscribe to.
+        group_id: The consumer group identifier.
+        event_schema: The Pydantic BaseEvent subclass for deserialization.
     """
 
     topic: str

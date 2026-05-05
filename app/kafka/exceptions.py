@@ -1,3 +1,9 @@
+"""Kafka specific exceptions.
+
+Defines custom exceptions thrown by the Kafka wrapper components for
+connection, publishing, and consumption errors.
+"""
+
 from app.core.exceptions import FluentMeetException
 
 
