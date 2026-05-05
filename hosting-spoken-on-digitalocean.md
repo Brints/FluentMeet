@@ -116,7 +116,7 @@ services:
   # ── Redis ──────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
-    container_name: fluentmeet-redis
+    container_name: spoken-redis
     restart: always
     command: redis-server --appendonly yes
     volumes:
@@ -127,12 +127,12 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - fluentmeet-net
+      - spoken-net
 
   # ── Kafka (KRaft mode) ────────────────────────────────────
   kafka:
     image: apache/kafka:3.7.0
-    container_name: fluentmeet-kafka
+    container_name: spoken-kafka
     restart: always
     environment:
       KAFKA_NODE_ID: 1
@@ -156,14 +156,14 @@ services:
       retries: 5
       start_period: 30s
     networks:
-      - fluentmeet-net
+      - spoken-net
 
-  # ── FluentMeet API ─────────────────────────────────────────
+  # ── Spoken API ─────────────────────────────────────────
   api:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: fluentmeet-api
+    container_name: spoken-api
     restart: always
     env_file:
       - .env.prod
@@ -179,14 +179,14 @@ services:
     ports:
       - "8000:8000"
     networks:
-      - fluentmeet-net
+      - spoken-net
 
 volumes:
   redis_data:
   kafka_data:
 
 networks:
-  fluentmeet-net:
+  spoken-net:
     driver: bridge
 ```
 
@@ -225,7 +225,7 @@ OPENAI_API_KEY=
 # ── Google OAuth ─────────────────────────────────────────────
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
-GOOGLE_REDIRECT_URI=https://spoken.unraveldocs.xyz/api/v1/auth/google/callback
+GOOGLE_REDIRECT_URI=https://spoken-api.unraveldocs.xyz/api/v1/auth/google/callback
 
 # ── Cloudinary ───────────────────────────────────────────────
 CLOUDINARY_CLOUD_NAME=
@@ -379,7 +379,8 @@ nslookup spoken.unraveldocs.xyz
 SSH into your Droplet from your Windows terminal:
 
 ```powershell
-ssh root@164.90.xxx.xxx
+ssh root@164.90.xxx.xxx or
+ssh -i path/to/your/spoken-api deploy@165.227.168.173
 ```
 
 ### 4a. System Updates & Firewall
@@ -402,8 +403,18 @@ ufw status
 adduser deploy
 usermod -aG sudo deploy
 
-# Copy SSH key to new user
-rsync --archive --chown=deploy:deploy ~/.ssh /home/deploy
+# Create the .ssh directory for the deploy user
+mkdir -p /home/deploy/.ssh
+
+# Copy the authorized_keys file (this is what allows you to log in)
+cp /root/.ssh/authorized_keys /home/deploy/.ssh/
+
+# Give the deploy user ownership of their .ssh folder
+chown -R deploy:deploy /home/deploy/.ssh
+
+# Set the correct permissions (important!)
+chmod 700 /home/deploy/.ssh
+chmod 600 /home/deploy/.ssh/authorized_keys
 
 # Test login in a NEW terminal before closing root session
 # ssh deploy@164.90.xxx.xxx
@@ -412,7 +423,8 @@ rsync --archive --chown=deploy:deploy ~/.ssh /home/deploy
 From now on, SSH as `deploy`:
 
 ```powershell
-ssh deploy@164.90.xxx.xxx
+ssh deploy@164.90.xxx.xxx or
+ssh -i path/to/your/spoken-api deploy@165.227.168.173
 ```
 
 ### 4c. Install Docker & Docker Compose
@@ -533,7 +545,7 @@ Nginx acts as a reverse proxy: it receives HTTPS traffic on port 443, terminates
 ### 8a. Create Nginx Config
 
 ```bash
-sudo nano /etc/nginx/sites-available/spoken.unraveldocs.xyz
+sudo vim /etc/nginx/sites-available/spoken-api.unraveldocs.xyz
 ```
 
 Paste this config:
@@ -585,7 +597,7 @@ server {
 #
 #     # ── API & general proxy ────────────────────────────────
 #     location / {
-#         proxy_pass http://fluentmeet_api;
+#         proxy_pass http://spoken_api;
 #         proxy_set_header Host $host;
 #         proxy_set_header X-Real-IP $remote_addr;
 #         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -599,7 +611,7 @@ server {
 #
 #     # ── WebSocket endpoints ────────────────────────────────
 #     location /api/v1/meetings/ {
-#         proxy_pass http://fluentmeet_api;
+#         proxy_pass http://spoken_api;
 #         proxy_http_version 1.1;
 #         proxy_set_header Upgrade $http_upgrade;
 #         proxy_set_header Connection "upgrade";
@@ -649,7 +661,7 @@ sudo apt install -y certbot python3-certbot-nginx
 ```bash
 sudo certbot certonly --webroot \
     -w /var/www/certbot \
-    -d spoken.unraveldocs.xyz \
+    -d spoken-api.unraveldocs.xyz \
     --email your-email@example.com \
     --agree-tos \
     --non-interactive
@@ -658,7 +670,7 @@ sudo certbot certonly --webroot \
 ### 9c. Enable the HTTPS Block in Nginx
 
 ```bash
-sudo nano /etc/nginx/sites-available/spoken.unraveldocs.xyz
+sudo vim /etc/nginx/sites-available/spoken-api.unraveldocs.xyz
 ```
 
 **Uncomment the entire `server { listen 443 ... }` block** (remove every `#` and the leading space from each line in that block).
@@ -704,7 +716,7 @@ Or enter the container and override manually:
 ```bash
 docker compose -f docker-compose.prod.yml exec api bash
 # Inside the container — replace with your actual Supabase direct connection string:
-sed -i "s|sqlalchemy.url = .*|sqlalchemy.url = postgresql+asyncpg://postgres.<ref>:<PASSWORD>@aws-0-<region>.pooler.supabase.com:5432/postgres|" alembic.ini
+sed -i "s|sqlalchemy.url = .*|sqlalchemy.url = postgresql+asyncpg://postgres.cvnmewtuaesokmprqvax:yiGfjLS7jyk1Udj6@aws-1-eu-central-1.pooler.supabase.com:5432/postgres|" alembic.ini
 alembic upgrade head
 exit
 ```
@@ -718,7 +730,7 @@ exit
 ### 10a. Health Check
 
 ```bash
-curl https://spoken.unraveldocs.xyz/health
+curl https://spoken-api.unraveldocs.xyz/health
 ```
 
 Expected response:
@@ -738,7 +750,7 @@ Expected response:
 Open in your browser:
 
 ```
-https://spoken.unraveldocs.xyz/docs
+https://spoken-api.unraveldocs.xyz/docs
 ```
 
 You should see the FastAPI Swagger UI.
@@ -747,13 +759,13 @@ You should see the FastAPI Swagger UI.
 
 ```bash
 # Install wscat if needed: npm install -g wscat
-wscat -c wss://spoken.unraveldocs.xyz/api/v1/meetings/ws/test
+wscat -c wss://spoken-api.unraveldocs.xyz/api/v1/meetings/ws/test
 ```
 
 ### 10d. SSL Verification
 
 ```bash
-curl -vI https://spoken.unraveldocs.xyz 2>&1 | grep -E "SSL|subject|expire"
+curl -vI https://spoken-api.unraveldocs.xyz 2>&1 | grep -E "SSL|subject|expire"
 ```
 
 ---
@@ -763,7 +775,7 @@ curl -vI https://spoken.unraveldocs.xyz 2>&1 | grep -E "SSL|subject|expire"
 ### Updating the Application
 
 ```bash
-cd ~/apps/fluentmeet
+cd ~/apps/spoken-api
 git pull origin main
 
 # Rebuild and restart only the API container
@@ -856,10 +868,10 @@ df -h
 
 ```bash
 # SSH into server
-ssh deploy@164.90.xxx.xxx
+ssh deploy@[IP_ADDRESS]
 
 # Navigate to project
-cd ~/apps/fluentmeet
+cd ~/apps/spoken-api
 
 # Full deploy (pull + rebuild + migrate)
 git pull origin main && \
@@ -875,5 +887,5 @@ docker compose -f docker-compose.prod.yml down -v
 
 # Check everything is healthy
 docker compose -f docker-compose.prod.yml ps
-curl https://spoken.unraveldocs.xyz/health
+curl https://spoken-api.unraveldocs.xyz/health
 ```

@@ -20,7 +20,9 @@ class TransientEmailDeliveryError(Exception):
 
 class EmailTemplateRenderer:
     def __init__(self) -> None:
-        templates_root = Path(__file__).resolve().parent.parent / "templates" / "email"
+        templates_root = (
+            Path(__file__).resolve().parent.parent.parent / "templates" / "email"
+        )
         self._environment = Environment(
             loader=FileSystemLoader(str(templates_root)),
             autoescape=True,
