@@ -129,11 +129,7 @@ class MeetingRepository:
         Returns a tuple of (total_count, paginated_records) for meeting history.
         Each record matches the shape needed for `MeetingHistoryItem`.
         """
-        # Base query to get room info, participant count,
-        # and the role of the requesting user.
-        # We join Room with Participant to see the user's
-        # role in that specific room.
-        duration_minutes_expr = self._duration_minutes_expression()
+        _duration_minutes_expr = self._duration_minutes_expression()
 
         base_query = (
             select(
