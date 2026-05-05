@@ -1,0 +1,110 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      run_migrations:
+        description: 'Run Alembic migrations after deploy?'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+# Prevent concurrent deploys — queue them instead of cancelling
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to DigitalOcean Droplet
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      # ── 1. Checkout (for ref info only; actual code is pulled on server) ──
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # ── 2. SSH into droplet and deploy ───────────────────────────────────
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: 22
+          script_stop: true   # Abort if any command fails
+          script: |
+            set -e
+
+            echo "==> Navigating to project directory..."
+            cd ~/apps/spoken-api
+
+            echo "==> Pulling latest code from main..."
+            git pull origin main
+
+            echo "==> Rebuilding API container..."
+            docker compose -f docker-compose.prod.yml build api --no-cache
+
+            echo "==> Restarting API container..."
+            docker compose -f docker-compose.prod.yml up -d api
+
+            echo "==> Waiting for container to be healthy (up to 60s)..."
+            SECONDS=0
+            until [ "$(docker inspect --format='{{.State.Health.Status}}' spoken-api 2>/dev/null)" = "healthy" ] || [ $SECONDS -gt 60 ]; do
+              sleep 5
+            done
+
+            STATUS=$(docker inspect --format='{{.State.Health.Status}}' spoken-api 2>/dev/null || echo "unknown")
+            echo "==> Container health status: $STATUS"
+            if [ "$STATUS" != "healthy" ]; then
+              echo "ERROR: Container did not become healthy in time!"
+              docker compose -f docker-compose.prod.yml logs --tail=50 api
+              exit 1
+            fi
+
+      # ── 3. Run Alembic migrations (optional, on by default) ──────────────
+      - name: Run database migrations
+        if: ${{ github.event_name == 'push' || github.event.inputs.run_migrations == 'true' }}
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: 22
+          script_stop: true
+          script: |
+            set -e
+            echo "==> Running Alembic migrations..."
+            docker compose -f ~/apps/spoken-api/docker-compose.prod.yml exec -T api \
+              alembic -c alembic.ini -x sqlalchemy.url="${DATABASE_URL_DIRECT}" upgrade head
+            echo "==> Migrations complete."
+        env:
+          DATABASE_URL_DIRECT: ${{ secrets.DATABASE_URL_DIRECT }}
+
+      # ── 4. Smoke test — verify the health endpoint ────────────────────────
+      - name: Smoke test health endpoint
+        run: |
+          echo "==> Checking health endpoint..."
+          sleep 5
+          RESPONSE=$(curl -sf --max-time 15 https://spoken-api.unraveldocs.xyz/health || echo "FAILED")
+          echo "Health response: $RESPONSE"
+          if echo "$RESPONSE" | grep -q '"status"'; then
+            echo "✅ Deployment successful!"
+          else
+            echo "❌ Health check failed!"
+            exit 1
+          fi
+
+      # ── 5. Notify on failure ──────────────────────────────────────────────
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "Deployment failed for commit ${{ github.sha }} by ${{ github.actor }}"
+          echo "Check the logs above for details."
