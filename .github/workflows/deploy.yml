@@ -50,7 +50,7 @@ jobs:
             git pull origin main
 
             echo "==> Rebuilding API container..."
-            docker compose -f docker-compose.prod.yml build api --no-cache
+            docker compose -f docker-compose.prod.yml build api
 
             echo "==> Restarting API container..."
             docker compose -f docker-compose.prod.yml up -d api
