@@ -499,7 +499,8 @@ class MeetingService:
         if not room or room.host_id != host.id:
             raise ForbiddenException(message="Only the host can admit participants.")
 
-        # Fetch display_name BEFORE admit_from_lobby removes the entry from the lobby hash.
+        # Fetch display_name BEFORE admit_from_lobby
+        # removes the entry from the lobby hash.
         lobby = await self.state.get_lobby(room_code)
         display_name = lobby.get(target_user_id, {}).get("display_name", "")
 
@@ -523,7 +524,7 @@ class MeetingService:
                 "display_name": display_name,
                 "role": "guest",
             },
-            sender_id=target_user_id,  # Exclude the admitted user (they'll join themselves)
+            sender_id=target_user_id,  # Exclude the admitted user
         )
 
     async def end_room(self, host: User, room_code: str) -> Room:
