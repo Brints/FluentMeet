@@ -179,19 +179,16 @@ class MeetingService:
 
         return room
 
-    async def get_live_state(self, host: User, room_code: str) -> dict:
-        """Fetch active participant and waiting lobby details. Host only."""
+    async def get_live_state(self, user: User, room_code: str) -> dict:
+        """Fetch active participant and waiting lobby details."""
         room = self.repo.get_room_by_code(room_code)
         if not room:
             raise NotFoundException(message="Room not found.")
 
-        if room.host_id != host.id:
-            raise ForbiddenException(
-                message="Only the host can view live room state payload."
-            )
+        is_host = room.host_id == user.id
 
         active = await self.state.get_participants(room_code)
-        lobby = await self.state.get_lobby(room_code)
+        lobby = await self.state.get_lobby(room_code) if is_host else {}
 
         return {"active": active, "lobby": lobby}
 
@@ -506,6 +503,11 @@ class MeetingService:
 
         if not was_in_lobby:
             raise BadRequestException(message="User is not in the lobby.")
+
+        cm = get_connection_manager()
+        await cm.send_to_user(
+            room_code, target_user_id, {"type": "admitted", "room_code": room_code}
+        )
 
     async def end_room(self, host: User, room_code: str) -> Room:
         """Host forcibly ends the meeting for everyone."""

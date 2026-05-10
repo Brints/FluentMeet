@@ -713,7 +713,7 @@ class TestGetLiveStateRoute:
         assert "lobby" in body["data"]
 
     @pytest.mark.asyncio
-    async def test_non_host_cannot_get_live_state(
+    async def test_non_host_gets_live_state_without_lobby(
         self, client: httpx.AsyncClient, db_session: Session
     ) -> None:
         _seed_user(db_session, email="host@example.com")
@@ -729,7 +729,10 @@ class TestGetLiveStateRoute:
             f"/api/v1/meetings/{room_code}/participants",
             headers=_auth_headers(other_token),
         )
-        assert resp.status_code == 403
+        assert resp.status_code == 200
+        body = resp.json()
+        assert "active" in body["data"]
+        assert body["data"]["lobby"] == {}
 
 
 # ---------------------------------------------------------------------------

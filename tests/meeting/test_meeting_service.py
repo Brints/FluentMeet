@@ -238,24 +238,28 @@ class TestGetLiveState:
         state.get_participants.return_value = {"u1": {"status": "connected"}}
         state.get_lobby.return_value = {"u2": {"display_name": "Guest"}}
 
-        result = await svc.get_live_state(host=host, room_code="ABCDEF123456")
+        result = await svc.get_live_state(user=host, room_code="ABCDEF123456")
 
         assert "active" in result
         assert "lobby" in result
         assert len(result["active"]) == 1
         assert len(result["lobby"]) == 1
 
-    @pytest.mark.asyncio
-    async def test_raises_forbidden_for_non_host(self) -> None:
-        svc, repo, _state = _build_service()
+    async def test_non_host_receives_empty_lobby(self) -> None:
+        svc, repo, state = _build_service()
         host = _make_user()
         other_user = _make_user(email="other@example.com")
         room = _make_room(host_id=host.id)
 
         repo.get_room_by_code.return_value = room
+        state.get_participants.return_value = {"u1": {"status": "connected"}}
+        state.get_lobby.return_value = {"u2": {"display_name": "Guest"}}
 
-        with pytest.raises(ForbiddenException, match="Only the host"):
-            await svc.get_live_state(host=other_user, room_code="ABCDEF123456")
+        result = await svc.get_live_state(user=other_user, room_code="ABCDEF123456")
+
+        assert "active" in result
+        assert result["lobby"] == {}
+        assert len(result["active"]) == 1
 
     @pytest.mark.asyncio
     async def test_raises_not_found_for_missing_room(self) -> None:
@@ -264,7 +268,7 @@ class TestGetLiveState:
         repo.get_room_by_code.return_value = None
 
         with pytest.raises(NotFoundException):
-            await svc.get_live_state(host=host, room_code="INVALID")
+            await svc.get_live_state(user=host, room_code="INVALID")
 
 
 # ---------------------------------------------------------------------------

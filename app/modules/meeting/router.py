@@ -130,14 +130,14 @@ async def get_room(
 @router.get(
     "/{room_code}/participants",
     status_code=status.HTTP_200_OK,
-    summary="Get live active participants and lobby waiting list (Host only)",
+    summary="Get live active participants and lobby waiting list",
 )
 async def get_live_state(
     room_code: str,
     current_user: User = Depends(get_current_user),
     service: MeetingService = Depends(get_meeting_service),
 ) -> JSONResponse:
-    state = await service.get_live_state(host=current_user, room_code=room_code)
+    state = await service.get_live_state(user=current_user, room_code=room_code)
     return JSONResponse(
         content={
             "status": "success",
