@@ -66,8 +66,22 @@ def get_engine() -> Engine:
     """
     cached_engine = _ENGINE_STATE.get("engine")
     if cached_engine is None:
+        # Optimization: connect_args ensures SSL is stable for managed DBs.
+        # pool_recycle handles server-side idle timeouts (Supabase/DigitalOcean).
+        connect_args = {}
+        if DATABASE_URL.startswith("postgresql"):
+            connect_args["sslmode"] = "require"
+
         try:
-            cached_engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+            cached_engine = create_engine(
+                DATABASE_URL,
+                pool_pre_ping=True,
+                pool_size=20,
+                max_overflow=20,
+                pool_recycle=300,  # 5 minutes
+                pool_timeout=30,
+                connect_args=connect_args,
+            )
         except ModuleNotFoundError as exc:
             # CI/test environments may not install PostgreSQL DBAPI drivers.
             if DATABASE_URL.startswith("postgresql") and exc.name in {
@@ -75,7 +89,10 @@ def get_engine() -> Engine:
                 "psycopg",
                 "asyncpg",
             }:
-                cached_engine = create_engine(DEFAULT_SQLITE_URL, pool_pre_ping=True)
+                cached_engine = create_engine(
+                    DEFAULT_SQLITE_URL,
+                    pool_pre_ping=True,
+                )
             else:
                 raise
         SessionLocal.configure(bind=cached_engine)
