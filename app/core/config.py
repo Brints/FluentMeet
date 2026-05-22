@@ -119,10 +119,10 @@ class Settings(BaseSettings):
     FRONTEND_BASE_URL: str = "http://localhost:4200"
 
     # CORS
-    CORS_ORIGINS: list[str] = [
-        "http://localhost:4200",
-        "https://spoken-frontend.onrender.com",
-    ]
+    @property
+    def CORS_ORIGINS(self) -> list[str]:
+        origins = [self.FRONTEND_BASE_URL.rstrip("/")] if self.FRONTEND_BASE_URL else []
+        return [o for o in origins if o]
 
     model_config = SettingsConfigDict(
         env_file=".env", case_sensitive=True, extra="ignore"

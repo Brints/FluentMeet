@@ -93,10 +93,19 @@ class KafkaManager:
         await admin_client.start()
         try:
             # DLQ topics for each required topic + standard topics
+            PIPELINE_TOPIC_SET = {
+                AUDIO_RAW,
+                AUDIO_SYNTHESIZED,
+                TEXT_ORIGINAL,
+                TEXT_TRANSLATED,
+            }
             new_topics = []
             for topic in TOPICS_TO_CREATE:
+                partitions = 3 if topic in PIPELINE_TOPIC_SET else 1
                 new_topics.append(
-                    NewTopic(name=topic, num_partitions=1, replication_factor=1)
+                    NewTopic(
+                        name=topic, num_partitions=partitions, replication_factor=1
+                    )
                 )
                 new_topics.append(
                     NewTopic(

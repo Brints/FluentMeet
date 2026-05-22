@@ -51,13 +51,28 @@ def mock_audio_ingest():
 
 
 @pytest.fixture
-def mock_kafka_consumer():
-    with patch("app.modules.meeting.ws_router.AIOKafkaConsumer") as mock_consumer_class:
-        consumer = AsyncMock()
-        consumer.start = AsyncMock()
-        consumer.stop = AsyncMock()
-        mock_consumer_class.return_value = consumer
-        yield consumer
+def mock_redis_client():
+    with patch("app.modules.auth.token_store._get_redis_client") as mock_get_redis:
+        redis_mock = MagicMock()
+        pubsub_mock = MagicMock()
+
+        async def mock_subscribe(*args, **kwargs):
+            pass
+
+        async def mock_unsubscribe(*args, **kwargs):
+            pass
+
+        async def mock_listen():
+            if False:
+                yield
+
+        pubsub_mock.subscribe = mock_subscribe
+        pubsub_mock.unsubscribe = mock_unsubscribe
+        pubsub_mock.listen = mock_listen
+
+        redis_mock.pubsub.return_value = pubsub_mock
+        mock_get_redis.return_value = redis_mock
+        yield redis_mock
 
 
 @pytest.fixture
@@ -98,18 +113,10 @@ def test_signaling_websocket(mock_connection_manager):
     )
 
 
-@pytest.mark.usefixtures("mock_room_participant")
+@pytest.mark.usefixtures("mock_room_participant", "mock_redis_client")
 def test_audio_websocket_ingest(
     mock_audio_ingest,
-    mock_kafka_consumer,
 ):
-    # Mock __aiter__ to be an async generator
-    async def mock_aiter():
-        if False:
-            yield
-
-    mock_kafka_consumer.__aiter__.side_effect = mock_aiter
-
     with client.websocket_connect(
         "/api/v1/ws/audio/room1?token=mock_token"
     ) as websocket:

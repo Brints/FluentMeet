@@ -6,6 +6,7 @@ languages from the room's participant state in Redis, calls the DeepL API
 target language to ``text.translated``.
 """
 
+import asyncio
 import logging
 import time
 from typing import Any
@@ -67,10 +68,10 @@ class TranslationWorker(BaseConsumer):
 
         # 1. Determine target languages from room participants
         participants = await self._state.get_participants(payload.room_id)
-        target_languages = {
-            state.get("language", "en")
-            for state in participants.values()
-            if state.get("language", "en") != payload.source_language
+        target_languages: set[str] = {
+            str(participant_state.get("language", "en"))
+            for participant_state in participants.values()
+            if str(participant_state.get("language", "en")) != payload.source_language
         }
 
         if not target_languages:
@@ -81,54 +82,87 @@ class TranslationWorker(BaseConsumer):
             )
             return
 
-        # 2. Translate for each target language
-        for target_lang in target_languages:
+        # 2. Translate concurrently for all target languages
+        async def _translate_one(
+            target_lang: str,
+        ) -> tuple[str, str | None, Exception | None]:
+            """Translate to a single language, returning (lang, text, error)."""
             try:
-                translated_text = await self._translate_text(
+                translated = await self._translate_text(
                     payload.text,
                     source_language=payload.source_language,
                     target_language=target_lang,
                 )
+                return target_lang, translated, None
+            except Exception as exc:
+                return target_lang, None, exc
 
-                if not translated_text:
-                    logger.warning(
-                        "Empty translation for seq=%d target=%s",
-                        payload.sequence_number,
-                        target_lang,
-                    )
-                    continue
+        results = await asyncio.gather(
+            *[_translate_one(lang) for lang in target_languages]
+        )
 
-                # 3. Publish translation event
-                translation_payload = TranslationPayload(
+        # 3. Publish successful translations, collect failures
+        failures: list[tuple[str, Exception]] = []
+        for target_lang, translated_text, error in results:
+            if error is not None:
+                logger.error(
+                    "Translation failed for seq=%d target=%s: %s",
+                    payload.sequence_number,
+                    target_lang,
+                    error,
+                )
+                failures.append((target_lang, error))
+                continue
+
+            if not translated_text:
+                logger.warning(
+                    "Empty translation for seq=%d target=%s",
+                    payload.sequence_number,
+                    target_lang,
+                )
+                continue
+
+            translation_payload = TranslationPayload(
+                room_id=payload.room_id,
+                user_id=payload.user_id,
+                sequence_number=payload.sequence_number,
+                original_text=payload.text,
+                translated_text=translated_text,
+                source_language=payload.source_language,
+                target_language=target_lang,
+            )
+            translation_event = TranslationEvent(payload=translation_payload)
+
+            await self._producer.send(
+                TEXT_TRANSLATED, translation_event, key=payload.room_id
+            )
+
+            # Publish caption event to Redis Pub/Sub for real-time delivery
+            try:
+                await self._publish_caption_to_redis(
                     room_id=payload.room_id,
-                    user_id=payload.user_id,
-                    sequence_number=payload.sequence_number,
-                    original_text=payload.text,
-                    translated_text=translated_text,
-                    source_language=payload.source_language,
-                    target_language=target_lang,
+                    speaker_id=payload.user_id,
+                    text=translated_text,
+                    language=target_lang,
+                    is_translation=True,
                 )
-                translation_event = TranslationEvent(payload=translation_payload)
+            except Exception as redis_err:
+                logger.warning("Redis caption publish failed: %s", redis_err)
 
-                await self._producer.send(
-                    TEXT_TRANSLATED, translation_event, key=payload.room_id
-                )
+            logger.debug(
+                "Translation: seq=%d %s→%s text='%s'",
+                payload.sequence_number,
+                payload.source_language,
+                target_lang,
+                translated_text[:50],
+            )
 
-                logger.debug(
-                    "Translation: seq=%d %s→%s text='%s'",
-                    payload.sequence_number,
-                    payload.source_language,
-                    target_lang,
-                    translated_text[:50],
-                )
-
-            except Exception:
-                logger.exception(
-                    "Translation failed for seq=%d target=%s",
-                    payload.sequence_number,
-                    target_lang,
-                )
-                raise
+        # If any translations failed, raise to trigger retry for the whole batch
+        if failures:
+            failed_langs = [lang for lang, _ in failures]
+            raise RuntimeError(
+                f"Translation failed for {len(failures)} language(s): {failed_langs}"
+            )
 
         elapsed_ms = (time.monotonic() - pipeline_start) * 1000
         logger.info(
@@ -192,3 +226,29 @@ class TranslationWorker(BaseConsumer):
             return f"[Mocked Translation -> {target_language}]: {text}"
 
         return str(result.get("translated_text", ""))
+
+    async def _publish_caption_to_redis(
+        self,
+        *,
+        room_id: str,
+        speaker_id: str,
+        text: str,
+        language: str,
+        is_translation: bool,
+    ) -> None:
+        """Publish a caption event to Redis Pub/Sub for real-time WebSocket delivery."""
+        import json
+
+        from app.modules.auth.token_store import _get_redis_client
+
+        redis = _get_redis_client()
+        caption_msg = {
+            "event": "caption",
+            "speaker_id": speaker_id,
+            "text": text,
+            "language": language,
+            "is_final": True,
+            "is_translation": is_translation,
+            "timestamp_ms": int(time.time() * 1000),
+        }
+        await redis.publish(f"pipeline:captions:{room_id}", json.dumps(caption_msg))

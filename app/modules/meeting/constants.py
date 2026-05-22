@@ -46,6 +46,40 @@ MSG_MEETING_HISTORY = "Meeting history retrieved successfully."
 MSG_INVITATIONS_SENT = "Meeting invitations sent."
 
 
+# ── Supported Languages ───────────────────────────────────────────────
+SUPPORTED_LANGUAGES: Final[set[str]] = {
+    "en",  # English
+    "de",  # German
+    "fr",  # French
+    "es",  # Spanish
+    "it",  # Italian
+    "pt",  # Portuguese
+    "nl",  # Dutch
+    "pl",  # Polish
+    "ru",  # Russian
+    "ja",  # Japanese
+    "zh",  # Chinese
+    "ko",  # Korean
+    "tr",  # Turkish
+}
+
+LANGUAGE_NAMES: Final[dict[str, str]] = {
+    "en": "English",
+    "de": "German",
+    "fr": "French",
+    "es": "Spanish",
+    "it": "Italian",
+    "pt": "Portuguese",
+    "nl": "Dutch",
+    "pl": "Polish",
+    "ru": "Russian",
+    "ja": "Japanese",
+    "zh": "Chinese",
+    "ko": "Korean",
+    "tr": "Turkish",
+}
+
+
 # ── Redis Key Patterns ────────────────────────────────────────────────
 def key_room_participants(room_code: str) -> str:
     return f"room:{room_code}:participants"

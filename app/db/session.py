@@ -70,7 +70,10 @@ def get_engine() -> Engine:
         # pool_recycle handles server-side idle timeouts (Supabase/DigitalOcean).
         connect_args = {}
         if DATABASE_URL.startswith("postgresql"):
-            connect_args["sslmode"] = "require"
+            if "localhost" in DATABASE_URL:
+                connect_args["sslmode"] = "disable"
+            else:
+                connect_args["sslmode"] = "require"
 
         try:
             cached_engine = create_engine(

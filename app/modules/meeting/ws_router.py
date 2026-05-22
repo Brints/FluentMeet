@@ -1,7 +1,6 @@
 """Meeting WebSockets Integrations module.
 
-WebSocket endpoints for real-time signaling, audio streaming, and captions
-seamlessly intelligently reliably.
+WebSocket endpoints for real-time signaling, audio streaming, and captions.
 """
 
 import asyncio
@@ -10,12 +9,9 @@ import json
 import logging
 import time
 
-from aiokafka import AIOKafkaConsumer  # type: ignore[import-untyped]
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 
-from app.core.config import settings
 from app.core.sanitize import log_sanitizer, sanitize_for_log
-from app.kafka.topics import AUDIO_SYNTHESIZED, TEXT_ORIGINAL, TEXT_TRANSLATED
 from app.modules.meeting.state import MeetingStateService
 from app.modules.meeting.ws_dependencies import assert_room_participant, authenticate_ws
 from app.schemas.pipeline import (
@@ -35,17 +31,12 @@ async def signaling_websocket(
     room_code: str,
     user_id: str = Depends(authenticate_ws),
 ) -> None:
-    """Relays WebRTC Offer, Answer, and ICE Candidate messages between peers
-    naturally cleanly mappings logically confidently reliably elegantly optimally
-    successfully accurately efficiently correctly accurately dynamically smoothly
-    gracefully cleanly successfully reliably optimally cleanly successfully.
+    """Relays WebRTC Offer, Answer, and ICE Candidate messages between peers.
 
     Args:
-        websocket (WebSocket): Protocol mapping gracefully effectively gracefully
-            efficiently seamlessly cleanly natively efficiently intelligently.
-        room_code (str): Video URL param effectively efficiently dynamically
-            gracefully successfully locally.
-        user_id (str): Extracted authenticated bounds safely cleanly reliably smoothly.
+        websocket (WebSocket): Protocol mapping.
+        room_code (str): Video URL param.
+        user_id (str): Extracted authenticated bounds.
     """
     try:
         participant_state = await assert_room_participant(room_code, user_id)
@@ -121,19 +112,12 @@ async def audio_websocket(  # noqa: C901
     room_code: str,
     user_id: str = Depends(authenticate_ws),
 ) -> None:
-    """Bidirectional audio stream structurally confidently perfectly beautifully
-    intelligently flawlessly gracefully stably cleanly successfully robustly
-    gracefully optimally logically carefully successfully elegantly.
+    """Bidirectional audio stream.
 
     Args:
-        websocket (WebSocket): Protocol native tracker cleanly cleanly gracefully
-            elegantly perfectly beautifully accurately neatly effectively.
-        room_code (str): Room id safely neatly accurately intelligently seamlessly
-            properly carefully smoothly nicely smartly correctly beautifully safely
-            perfectly cleanly cleanly.
-        user_id (str): Authenticated limit string naturally cleanly neatly gracefully
-            intelligently smartly beautifully seamlessly safely correctly reliably
-            beautifully cleanly carefully.
+        websocket (WebSocket): Protocol native tracker.
+        room_code (str): Room id.
+        user_id (str): Authenticated limit string.
     """
     try:
         participant_state = await assert_room_participant(room_code, user_id)
@@ -184,8 +168,8 @@ async def audio_websocket(  # noqa: C901
                         room_id=room_code,
                         user_id=user_id,
                         audio_bytes=chunk,
-                        # Use speaking_language (what the user speaks) — not
-                        # listening_language (what they want to hear) so STT
+                        # Use speaking_language — not
+                        # listening_language so STT
                         # transcribes in the correct language.
                         source_language=participant_state.get(
                             "speaking_language", "en"
@@ -214,74 +198,55 @@ async def audio_websocket(  # noqa: C901
     egress_ready = asyncio.Event()
 
     async def egress_task() -> None:
-        """Reads Kafka synthesized audio, filters for user, writes to WS."""
-        # Use a unique group_id per connection so Kafka assigns all partitions
-        # to this consumer and auto_offset_reset="latest" starts from the tail.
-        # A group-less consumer in AIOKafka requires explicit partition.assign()
-        # which is unreliable on a freshly-joined broker; a unique group is simpler.
-        group_id = f"audio-egress-{room_code}-{user_id}-{time.time_ns()}"
-        consumer = AIOKafkaConsumer(
-            AUDIO_SYNTHESIZED,
-            bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
-            group_id=group_id,
-            auto_offset_reset="latest",
-            value_deserializer=lambda v: json.loads(v.decode("utf-8")),
-            enable_auto_commit=True,
-        )
-        try:
-            await consumer.start()
-        except Exception as start_err:
-            logger.error(
-                "Egress consumer failed to start for user=%s room=%s: %s",
-                sanitize_for_log(user_id),
-                sanitize_for_log(room_code),
-                start_err,
-            )
-            egress_ready.set()  # Unblock ingest so ingest can still run
-            return
+        """Reads Redis Pub/Sub synthesized audio, filters for user, writes to WS."""
+        from app.modules.auth.token_store import _get_redis_client
+
+        redis = _get_redis_client()
+        pubsub = redis.pubsub()
+        channel = f"pipeline:audio:{room_code}"
+        await pubsub.subscribe(channel)
 
         egress_ready.set()  # Signal that we are ready to receive
 
-        # Track the highest sequence seen to drop stale frames arriving out-of-order
+        # Track the highest sequence seen to drop stale frames
         highest_seq: dict[str, int] = {}
+        # Cache participant count to avoid per-frame Redis lookups
+        _cached_participant_count: int = 0
+        _cache_ts: float = 0.0
 
         try:
-            async for msg in consumer:
+            async for message in pubsub.listen():
+                if message["type"] != "message":
+                    continue
+
                 try:
-                    event = SynthesizedAudioEvent.model_validate(msg.value)
+                    event = SynthesizedAudioEvent.model_validate(
+                        json.loads(message["data"])
+                    )
                     payload = event.payload
 
-                    # Filter by Room
-                    if payload.room_id != room_code:
-                        continue
+                    # Room filter is implicit (we subscribed to room-specific channel)
 
-                    # Language filter: In production with multiple participants,
-                    # only deliver audio matching the listener's language.
-                    # For single-user testing, skip the filter so the speaker
-                    # can hear their own translated audio.
-                    participants = await MeetingStateService().get_participants(
-                        room_code
-                    )
+                    # Language filter with cached participant count
+                    now = time.time()
+                    if now - _cache_ts > 5.0:
+                        participants = await MeetingStateService().get_participants(
+                            room_code
+                        )
+                        _cached_participant_count = len(participants)
+                        _cache_ts = now
+
                     if (
-                        len(participants) > 1
+                        _cached_participant_count > 1
                         and payload.target_language != listening_language
                     ):
-                        logger.debug(
-                            "Egress: skipping lang mismatch target=%s != listening=%s",
-                            sanitize_for_log(payload.target_language),
-                            sanitize_for_log(listening_language),
-                        )
                         continue
 
-                    # Stale frame guard (drop if more than 10 sequences behind latest)
+                    # Stale frame guard (drop if more than 10 sequences behind)
                     speaker_key = payload.user_id
                     current_highest = highest_seq.get(speaker_key, -1)
 
                     if payload.sequence_number < current_highest - 10:
-                        logger.debug(
-                            "Dropped stale audio frame from %s",
-                            sanitize_for_log(speaker_key),
-                        )
                         continue
 
                     highest_seq[speaker_key] = max(
@@ -298,12 +263,15 @@ async def audio_websocket(  # noqa: C901
                             sanitize_for_log(user_id),
                             send_err,
                         )
+                        break
 
                 except Exception as frame_err:
                     logger.exception("Error processing egress frame: %s", frame_err)
 
+        except asyncio.CancelledError:
+            pass
         finally:
-            await consumer.stop()
+            await pubsub.unsubscribe(channel)
 
     async def guarded_ingest_task() -> None:
         """Wait for egress consumer to be ready, then start ingesting."""
@@ -332,9 +300,8 @@ async def captions_websocket(
     room_code: str,
     user_id: str = Depends(authenticate_ws),
 ) -> None:
-    """Broadcasts original and translated transcription events."""
+    """Broadcasts original and translated transcription events via Redis Pub/Sub."""
     try:
-        # Validate they are in the room, but we don't strictly *need* their state
         _ = await assert_room_participant(room_code, user_id)
     except Exception as e:
         await websocket.close(code=1008, reason=str(e))
@@ -342,47 +309,28 @@ async def captions_websocket(
 
     await websocket.accept()
 
-    # Use a persistent user-specific group so reconnects don't drop captions
-    # Note: "Subscribe from now" is handled via auto_offset_reset="latest"
-    # in their group creation or by wiping the group offsets.
-    # We'll use a dynamic timestamp group to force "latest".
-    consumer = AIOKafkaConsumer(
-        TEXT_ORIGINAL,
-        TEXT_TRANSLATED,
-        bootstrap_servers=settings.KAFKA_BOOTSTRAP_SERVERS,
-        group_id=f"captions-{room_code}-{user_id}-{int(time.time())}",
-        auto_offset_reset="latest",
-        value_deserializer=lambda v: json.loads(v.decode("utf-8")),
-    )
+    from app.modules.auth.token_store import _get_redis_client
 
-    await consumer.start()
+    redis = _get_redis_client()
+    pubsub = redis.pubsub()
+    channel = f"pipeline:captions:{room_code}"
+    await pubsub.subscribe(channel)
 
     try:
-        async for msg in consumer:
-            payload_data = msg.value.get("payload", {})
-            if payload_data.get("room_id") != room_code:
+        async for message in pubsub.listen():
+            if message["type"] != "message":
                 continue
 
-            # Build unified caption response depending on topic
-            is_translation = msg.topic == TEXT_TRANSLATED
-
-            caption_msg = {
-                "event": "caption",
-                "speaker_id": payload_data.get("user_id"),
-                "is_final": payload_data.get("is_final", True),
-                "timestamp_ms": int(time.time() * 1000),
-            }
-
-            if is_translation:
-                caption_msg["language"] = payload_data.get("target_language")
-                caption_msg["text"] = payload_data.get("translated_text")
-            else:
-                caption_msg["language"] = payload_data.get("source_language")
-                caption_msg["text"] = payload_data.get("text")
-
-            await websocket.send_json(caption_msg)
+            try:
+                caption_data = json.loads(message["data"])
+                # Only forward captions for this room (implicit via channel)
+                await websocket.send_json(caption_data)
+            except Exception as frame_err:
+                logger.warning("Error processing caption frame: %s", frame_err)
 
     except WebSocketDisconnect:
         pass
+    except asyncio.CancelledError:
+        pass
     finally:
-        await consumer.stop()
+        await pubsub.unsubscribe(channel)

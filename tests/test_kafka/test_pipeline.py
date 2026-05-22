@@ -73,6 +73,8 @@ async def test_stt_worker_handle(mock_producer, base_audio_chunk_event):
     with (
         patch("app.services.stt_worker.get_deepgram_stt_service") as mock_get_stt,
         patch("app.core.config.settings") as mock_settings,
+        patch("app.services.connection_manager.get_connection_manager") as mock_get_cm,
+        patch("app.modules.auth.token_store._get_redis_client") as mock_get_redis,
     ):
         mock_settings.DEEPGRAM_API_KEY = "fake-key"
 
@@ -84,10 +86,19 @@ async def test_stt_worker_handle(mock_producer, base_audio_chunk_event):
         }
         mock_get_stt.return_value = mock_stt_svc
 
-        await worker.handle(base_audio_chunk_event)
+        redis_mock = MagicMock()
+        redis_mock.publish = AsyncMock()
+        mock_get_redis.return_value = redis_mock
+
+        cm_mock = MagicMock()
+        cm_mock.broadcast_to_room = AsyncMock()
+        mock_get_cm.return_value = cm_mock
+
+        for _ in range(STTWorker.BUFFER_SIZE):
+            await worker.handle(base_audio_chunk_event)
 
         mock_stt_svc.transcribe.assert_called_once_with(
-            b"fake_audio",
+            b"fake_audio" * STTWorker.BUFFER_SIZE,
             language="en",
             sample_rate=16000,
             encoding="linear16",
@@ -113,6 +124,7 @@ async def test_translation_worker_handle(mock_producer, base_transcription_event
         ) as mock_get_deepl,
         patch("app.services.translation_worker.get_openai_translation_fallback"),
         patch("app.core.config.settings") as mock_settings,
+        patch("app.modules.auth.token_store._get_redis_client") as mock_get_redis,
     ):
         mock_settings.DEEPL_API_KEY = "fake-deepl-key"
         mock_settings.OPENAI_API_KEY = "fake-openai-key"
@@ -127,7 +139,7 @@ async def test_translation_worker_handle(mock_producer, base_transcription_event
         worker._state = mock_state
 
         mock_deepl = AsyncMock()
-        mock_deepl.supports_language.return_value = True
+        mock_deepl.supports_language = MagicMock(return_value=True)
         mock_deepl.translate.side_effect = (
             lambda _text, _source_language, target_language: {
                 "translated_text": f"Transl => {target_language}",
@@ -135,6 +147,10 @@ async def test_translation_worker_handle(mock_producer, base_transcription_event
             }
         )
         mock_get_deepl.return_value = mock_deepl
+
+        redis_mock = MagicMock()
+        redis_mock.publish = AsyncMock()
+        mock_get_redis.return_value = redis_mock
 
         await worker.handle(base_transcription_event)
 
@@ -162,6 +178,7 @@ async def test_tts_worker_handle(mock_producer, base_translation_event):
     with (
         patch("app.services.tts_worker.get_openai_tts_service") as mock_get_openai,
         patch("app.services.tts_worker.settings") as mock_settings,
+        patch("app.modules.auth.token_store._get_redis_client") as mock_get_redis,
     ):
         mock_settings.ACTIVE_TTS_PROVIDER = "openai"
         mock_settings.PIPELINE_AUDIO_ENCODING = "linear16"
@@ -172,6 +189,10 @@ async def test_tts_worker_handle(mock_producer, base_translation_event):
             "sample_rate": 24000,
         }
         mock_get_openai.return_value = mock_openai
+
+        redis_mock = MagicMock()
+        redis_mock.publish = AsyncMock()
+        mock_get_redis.return_value = redis_mock
 
         await worker.handle(base_translation_event)
 

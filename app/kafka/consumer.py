@@ -123,7 +123,7 @@ class BaseConsumer(abc.ABC):
                     age_ms = _time.time() * 1000 - msg.timestamp
                     if age_ms > self.max_message_age_ms:
                         topic_safe = sanitize_log_args(self.topic)[0]
-                        logger.debug(
+                        logger.info(
                             "Skipping stale message on '%s' (age=%.0fms > limit=%dms)",
                             topic_safe,
                             age_ms,
