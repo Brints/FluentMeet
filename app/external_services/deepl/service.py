@@ -55,6 +55,13 @@ class DeepLTranslationService:
 
     def __init__(self, timeout: float = 10.0) -> None:
         self._timeout = timeout
+        self._client: httpx.AsyncClient | None = None
+
+    @property
+    def client(self) -> httpx.AsyncClient:
+        if self._client is None or self._client.is_closed:
+            self._client = httpx.AsyncClient(timeout=self._timeout)
+        return self._client
 
     async def translate(
         self,
@@ -88,13 +95,12 @@ class DeepLTranslationService:
             payload["source_lang"] = deepl_source
 
         start = time.monotonic()
-        async with httpx.AsyncClient(timeout=self._timeout) as client:
-            response = await client.post(
-                settings.DEEPL_API_URL,
-                headers=headers,
-                json=payload,
-            )
-            response.raise_for_status()
+        response = await self.client.post(
+            settings.DEEPL_API_URL,
+            headers=headers,
+            json=payload,
+        )
+        response.raise_for_status()
 
         elapsed_ms = (time.monotonic() - start) * 1000
         logger.debug("DeepL translation completed in %.1fms", elapsed_ms)
@@ -131,6 +137,13 @@ class OpenAITranslationFallback:
 
     def __init__(self, timeout: float = 15.0) -> None:
         self._timeout = timeout
+        self._client: httpx.AsyncClient | None = None
+
+    @property
+    def client(self) -> httpx.AsyncClient:
+        if self._client is None or self._client.is_closed:
+            self._client = httpx.AsyncClient(timeout=self._timeout)
+        return self._client
 
     async def translate(
         self,
@@ -176,13 +189,12 @@ class OpenAITranslationFallback:
         }
 
         start = time.monotonic()
-        async with httpx.AsyncClient(timeout=self._timeout) as client:
-            response = await client.post(
-                "https://api.openai.com/v1/chat/completions",
-                headers=headers,
-                json=payload,
-            )
-            response.raise_for_status()
+        response = await self.client.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers=headers,
+            json=payload,
+        )
+        response.raise_for_status()
 
         elapsed_ms = (time.monotonic() - start) * 1000
         logger.debug("OpenAI translation fallback completed in %.1fms", elapsed_ms)

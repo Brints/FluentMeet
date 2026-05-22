@@ -36,6 +36,13 @@ class VoiceAITTSService:
 
     def __init__(self, timeout: float = 60.0) -> None:
         self._timeout = timeout
+        self._client: httpx.AsyncClient | None = None
+
+    @property
+    def client(self) -> httpx.AsyncClient:
+        if self._client is None or self._client.is_closed:
+            self._client = httpx.AsyncClient(timeout=self._timeout)
+        return self._client
 
     async def synthesize(
         self,
@@ -83,22 +90,20 @@ class VoiceAITTSService:
             "temperature": 1,
             "top_p": 0.8,
         }
-        print(f"Voice.ai Audio format: {audio_format}")
+        logger.debug("Voice.ai Audio format: %s", audio_format)
         if voice_id:
             payload["voice_id"] = voice_id
 
         start = time.monotonic()
-        async with httpx.AsyncClient(timeout=self._timeout) as client:
-            response = await client.post(
-                settings.VOICEAI_TTS_API_URL,
-                headers=headers,
-                json=payload,
-            )
-            response.raise_for_status()
+        response = await self.client.post(
+            settings.VOICEAI_TTS_API_URL,
+            headers=headers,
+            json=payload,
+        )
+        response.raise_for_status()
 
         elapsed_ms = (time.monotonic() - start) * 1000
-        print(f"Voice.ai TTS API completed in {elapsed_ms} ms")
-        logger.debug("Voice.ai TTS completed in %.1fms", elapsed_ms)
+        logger.debug("Voice.ai TTS API completed in %.1fms", elapsed_ms)
 
         return {
             "audio_bytes": response.content,

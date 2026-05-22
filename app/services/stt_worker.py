@@ -38,13 +38,24 @@ class STTWorker(BaseConsumer):
     group_id = "stt-worker-group"
     event_schema = AudioChunkEvent
 
+    # Buffer configuration
+    BUFFER_SIZE = 5  # Number of 100ms chunks to buffer (500ms total)
+
+    def __init__(self, producer: Any) -> None:
+        super().__init__(producer)
+        # Store buffers per user in room: { "room:user": [chunk1, chunk2, ...] }
+        self._audio_buffers: dict[str, list[bytes]] = {}
+        self._buffer_timestamps: dict[str, float] = {}
+
     # Skip audio chunks older than 2 minutes — they belong to sessions whose
     # room IDs no longer exist in Redis, so the translation worker would find
     # no participants and produce nothing anyway.
     max_message_age_ms = 120_000  # 2 minutes
 
     async def handle(self, event: BaseEvent[Any]) -> None:
-        """Process a single audio chunk: decode → STT → publish transcript.
+        """Process a single audio chunk with buffering.
+
+        Collect → decode → STT → publish.
 
         Args:
             event (BaseEvent[Any]): The deserialized wrapper containing the
@@ -55,16 +66,28 @@ class STTWorker(BaseConsumer):
 
         pipeline_start = time.monotonic()
 
-        # 1. Decode base64 audio
+        # 1. Decode and Buffer
         audio_bytes = base64.b64decode(payload.audio_data)
-
         if not audio_bytes:
-            logger.warning(
-                "Empty audio chunk seq=%d from user=%s, skipping",
-                payload.sequence_number,
-                payload.user_id,
-            )
             return
+
+        buffer_key = f"{payload.room_id}:{payload.user_id}"
+        if buffer_key not in self._audio_buffers:
+            self._audio_buffers[buffer_key] = []
+
+        self._audio_buffers[buffer_key].append(audio_bytes)
+        self._buffer_timestamps[buffer_key] = time.monotonic()
+
+        # Periodically sweep stale buffers (older than 60 seconds)
+        self._sweep_stale_buffers()
+
+        # Only proceed if we have enough chunks to make transcription viable
+        if len(self._audio_buffers[buffer_key]) < self.BUFFER_SIZE:
+            return
+
+        # Concatenate buffered chunks
+        full_audio = b"".join(self._audio_buffers[buffer_key])
+        self._audio_buffers[buffer_key] = []  # Clear buffer for next cycle
 
         # 2. Call Deepgram STT (or Mock it if no API Key provided)
         from app.core.config import settings
@@ -81,7 +104,7 @@ class STTWorker(BaseConsumer):
         else:
             stt_service = get_deepgram_stt_service()
             result = await stt_service.transcribe(
-                audio_bytes,
+                full_audio,
                 language=payload.source_language,
                 sample_rate=payload.sample_rate,
                 encoding=payload.encoding.value,
@@ -89,11 +112,7 @@ class STTWorker(BaseConsumer):
 
         text = result.get("text", "").strip()
         if not text:
-            logger.debug(
-                "No speech detected in chunk seq=%d from user=%s",
-                payload.sequence_number,
-                payload.user_id,
-            )
+            # If still no text after 500ms, it's likely just background noise/silence
             return
 
         # 3. Build and publish transcription event
@@ -128,11 +147,33 @@ class STTWorker(BaseConsumer):
                     },
                 )
             )
-            # Fix RUF006: Store a reference to the task to avoid garbage collection
             self._background_tasks.add(task)
             task.add_done_callback(self._background_tasks.discard)
         except Exception as e:
             logger.error("Failed to broadcast active speaker: %s", e)
+
+        # Publish transcription caption to Redis Pub/Sub for real-time delivery
+        try:
+            import json as _json
+
+            from app.modules.auth.token_store import _get_redis_client
+
+            redis = _get_redis_client()
+            caption_msg = {
+                "event": "caption",
+                "speaker_id": payload.user_id,
+                "text": text,
+                "language": transcription_payload.source_language,
+                "is_final": True,
+                "is_translation": False,
+                "timestamp_ms": int(time.time() * 1000),
+            }
+            await redis.publish(
+                f"pipeline:captions:{payload.room_id}",
+                _json.dumps(caption_msg),
+            )
+        except Exception as redis_err:
+            logger.warning("Redis caption publish failed: %s", redis_err)
 
         # 4. Log pipeline latency
         elapsed_ms = (time.monotonic() - pipeline_start) * 1000
@@ -141,7 +182,19 @@ class STTWorker(BaseConsumer):
             payload.sequence_number,
             payload.room_id,
             payload.user_id,
-            text[:50],
+            text,
             result.get("confidence", 0.0),
             elapsed_ms,
         )
+
+    def _sweep_stale_buffers(self) -> None:
+        """Remove audio buffers that haven't received new chunks in 60 seconds."""
+        now = time.monotonic()
+        stale_keys = [
+            key for key, ts in self._buffer_timestamps.items() if now - ts > 60.0
+        ]
+        for key in stale_keys:
+            self._audio_buffers.pop(key, None)
+            self._buffer_timestamps.pop(key, None)
+        if stale_keys:
+            logger.debug("Swept %d stale audio buffer(s)", len(stale_keys))

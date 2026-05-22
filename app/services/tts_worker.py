@@ -97,6 +97,12 @@ class TTSWorker(BaseConsumer):
 
         await self._producer.send(AUDIO_SYNTHESIZED, synth_event, key=payload.room_id)
 
+        # Publish to Redis Pub/Sub for real-time WebSocket egress delivery
+        try:
+            await self._publish_audio_to_redis(synth_event)
+        except Exception as redis_err:
+            logger.warning("Redis audio egress publish failed: %s", redis_err)
+
         # 4. Log pipeline latency
         elapsed_ms = (time.monotonic() - pipeline_start) * 1000
         logger.info(
@@ -130,3 +136,15 @@ class TTSWorker(BaseConsumer):
 
         # Default: OpenAI
         return await get_openai_tts_service().synthesize(text, encoding=encoding)
+
+    async def _publish_audio_to_redis(self, synth_event: SynthesizedAudioEvent) -> None:
+        """Publish synthesized audio to Redis Pub/Sub for WebSocket egress."""
+        import json
+
+        from app.modules.auth.token_store import _get_redis_client
+
+        redis = _get_redis_client()
+        await redis.publish(
+            f"pipeline:audio:{synth_event.payload.room_id}",
+            json.dumps(synth_event.model_dump(), default=str),
+        )

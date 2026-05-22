@@ -7,7 +7,9 @@ natively.
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+
+from app.modules.meeting.constants import SUPPORTED_LANGUAGES
 
 # ── Request schemas ───────────────────────────────────────────────────
 
@@ -61,6 +63,20 @@ class JoinRoomRequest(BaseModel):
         description="Language the participant will speak. "
         "Used for STT source language selection.",
     )
+
+    @field_validator("listening_language", "speaking_language", mode="before")
+    @classmethod
+    def validate_language_code(cls, v: str | None) -> str | None:
+        """Ensure language codes are supported ISO 639-1 values."""
+        if v is None:
+            return v
+        code = v.strip().lower()
+        if code not in SUPPORTED_LANGUAGES:
+            supported = ", ".join(sorted(SUPPORTED_LANGUAGES))
+            raise ValueError(
+                f"Unsupported language '{code}'. Supported languages: {supported}"
+            )
+        return code
 
 
 # ── Response schemas ──────────────────────────────────────────────────

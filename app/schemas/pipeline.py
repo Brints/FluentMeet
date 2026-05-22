@@ -37,14 +37,13 @@ class AudioChunkPayload(BaseModel):
     """Payload for a single audio chunk from a WebSocket client.
 
     Attributes:
-        room_id: Room the audio originates from securely mapped.
+        room_id: Room the audio originates from.
         user_id: Speaker's tracking ID (user UUID or guest session UUID).
         sequence_number: Monotonically increasing chunk index.
-        audio_data: Base64-encoded raw audio bytes manually structured natively
-            smoothly.
-        sample_rate: Audio sample rate natively mapping efficiently.
-        encoding: Audio encoding format mapped explicitly.
-        source_language: Speaker's language reliably securely nicely comfortably.
+        audio_data: Base64-encoded raw audio bytes.
+        sample_rate: Audio sample rate in Hz.
+        encoding: Audio encoding format.
+        source_language: Speaker's language code (ISO 639-1).
     """
 
     room_id: str = Field(..., description="Room the audio originates from.")
@@ -68,7 +67,7 @@ class AudioChunkEvent(BaseEvent[AudioChunkPayload]):
     """Kafka event wrapping a raw audio chunk for the STT stage.
 
     Attributes:
-        event_type: String constant resolving seamlessly logically statically.
+        event_type: Kafka event type identifier for audio chunks.
     """
 
     event_type: str = "audio.chunk"
@@ -81,15 +80,13 @@ class TranscriptionPayload(BaseModel):
     """Payload produced by the STT worker.
 
     Attributes:
-        room_id: Active tracker explicitly identifying organically flawlessly
-            dynamically mapped.
-        user_id: Connected speaker logically securely confidently dependably
-            smoothly.
-        sequence_number: Ordered limit elegantly flawlessly appropriately stably.
-        text: Transcribed result mapped automatically perfectly.
+        room_id: Room the transcription belongs to.
+        user_id: Speaker who produced the audio.
+        sequence_number: Ordered chunk index from the source audio.
+        text: Transcribed text from the audio chunk.
         source_language: Detected or declared source language.
-        is_final: Check bounds effectively naturally flawlessly.
-        confidence: Float organically cleanly cleanly successfully.
+        is_final: Whether this is a final transcription or an interim result.
+        confidence: STT confidence score (0.0 to 1.0).
     """
 
     room_id: str
@@ -124,19 +121,13 @@ class TranslationPayload(BaseModel):
     """Payload produced by the Translation worker.
 
     Attributes:
-        room_id: Active room identifier for the translation.
-        user_id: Participant rationally fluently suitably rationally cleanly
-            explicitly cleanly organically successfully realistically correctly
-            properly.
-        sequence_number: Stream limit intelligently cleanly comfortably naturally
-            effectively perfectly.
-        original_text: Initial text before translation.
-        translated_text: Resulting text after translation.
-        source_language: Identity rationally predictably optimally accurately
-            effortlessly structurally accurately elegantly optimally intelligently
-            fluently.
-        target_language: Target effectively elegantly successfully mapping
-            efficiently flawlessly seamlessly cleanly correctly securely accurately.
+        room_id: Room the translation belongs to.
+        user_id: Original speaker's tracking ID.
+        sequence_number: Ordered chunk index from the source transcription.
+        original_text: Text before translation.
+        translated_text: Text after translation.
+        source_language: ISO 639-1 code of the original language.
+        target_language: ISO 639-1 code of the translation target.
     """
 
     room_id: str

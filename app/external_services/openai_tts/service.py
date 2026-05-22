@@ -33,6 +33,13 @@ class OpenAITTSService:
 
     def __init__(self, timeout: float = 15.0) -> None:
         self._timeout = timeout
+        self._client: httpx.AsyncClient | None = None
+
+    @property
+    def client(self) -> httpx.AsyncClient:
+        if self._client is None or self._client.is_closed:
+            self._client = httpx.AsyncClient(timeout=self._timeout)
+        return self._client
 
     async def synthesize(
         self,
@@ -68,13 +75,12 @@ class OpenAITTSService:
         }
 
         start = time.monotonic()
-        async with httpx.AsyncClient(timeout=self._timeout) as client:
-            response = await client.post(
-                settings.OPENAI_TTS_API_URL,
-                headers=headers,
-                json=payload,
-            )
-            response.raise_for_status()
+        response = await self.client.post(
+            settings.OPENAI_TTS_API_URL,
+            headers=headers,
+            json=payload,
+        )
+        response.raise_for_status()
 
         elapsed_ms = (time.monotonic() - start) * 1000
         logger.debug("OpenAI TTS completed in %.1fms", elapsed_ms)

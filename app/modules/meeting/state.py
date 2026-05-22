@@ -1,7 +1,7 @@
 """Meeting ephemeral Redis State Service module.
 
-Generates atomic mapping tracking natively memory limits smoothly defining
-targets natively.
+Manages live meeting state (lobby, participants, active speaker) using Redis
+for high-performance ephemeral storage.
 """
 
 import json
@@ -23,11 +23,10 @@ logger = logging.getLogger(__name__)
 
 
 class MeetingStateService:
-    """Manages ephemeral live room state (lobby, participants presence,
-    active speaker) in Redis.
+    """Manages ephemeral live room state (lobby, participants, active speaker)
+    in Redis.
 
-    All operations are asynchronous and hit Redis directly smoothly handling
-    maps natively seamlessly.
+    All operations are asynchronous and interact with Redis directly.
     """
 
     def __init__(self, redis_client: aioredis.Redis | None = None) -> None:
@@ -48,16 +47,13 @@ class MeetingStateService:
         """Add or update a user's presence in the active room participants hash.
 
         Args:
-            room_code (str): Identity parameter dynamically natively resolving
-                identifiers.
-            user_id (str): User tracker string mapped locally natively limits
-                logically securely bindings natively.
-            language (str): Locale configuration gracefully array mapping.
-            hardware_ready (bool): Configuration map dynamically natively smoothly
-                correctly natively tracking gracefully gracefully locally securely
-                smoothly gracefully tracking natively handled array limit logically
-                seamlessly bounds dynamically safely correctly securely limits
-                correctly dynamically.
+            room_code: The room's unique identifier code.
+            user_id: The participant's unique identifier.
+            language: The participant's listening language (ISO 639-1).
+            speaking_language: The participant's speaking language (ISO 639-1).
+            hardware_ready: Whether the user's media devices are ready.
+            display_name: The participant's display name.
+            role: The participant's role (host, guest, participant).
         """
         state = {
             "status": "connected",
@@ -80,11 +76,8 @@ class MeetingStateService:
         """Remove a user from the active participants hash.
 
         Args:
-            room_code (str): Identity string naturally resolving natively
-                gracefully limits seamlessly dynamically correctly safely mapping
-                dynamically.
-            user_id (str): Evaluator tracking string string parameter seamlessly
-                mapping efficiently limits.
+            room_code: The room's unique identifier code.
+            user_id: The participant's unique identifier.
         """
         await cast(
             "Awaitable[Any]",

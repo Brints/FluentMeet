@@ -94,11 +94,13 @@ class AudioIngestService:
         kafka = get_kafka_manager()
         await kafka.producer.send(AUDIO_RAW, event, key=room_id)
 
-        logger.debug(
-            "Published audio chunk seq=%d for user=%s in room=%s",
+        logger.info(
+            "INGEST: seq=%d room=%s user=%s lang=%s size=%d bytes",
             seq,
-            log_sanitizer.sanitize(user_id),
             log_sanitizer.sanitize(room_id),
+            log_sanitizer.sanitize(user_id),
+            source_language,
+            len(audio_bytes),
         )
 
 
