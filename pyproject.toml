@@ -186,7 +186,7 @@ line-ending = "auto"
 
 [tool.isort]
 profile = "black"
-skip = ["alembic"]
+skip = ["alembic", "venv", ".venv"]
 
 [tool.mypy]
 python_version = "3.11"
