@@ -83,12 +83,10 @@ Generate a secure `SECRET_KEY` for JWT:
 python -c "import secrets; print(secrets.token_hex(32))"
 ```
 
-### **4. Local Development Setup**
-It is highly recommended to use a virtual environment:
+### 4. Local Development Setup
+It is highly recommended to use the `uv` tool for fast virtual environment and dependency management:
 ```bash
-python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-pip install -r requirements.txt
+uv sync
 ```
 
 ### **5. Infrastructure Setup (Docker)**
@@ -109,7 +107,8 @@ alembic upgrade headalembic upgrade head
 
 ### **Start the Backend**
 ```bash
-uvicorn app.main:app --reload
+uv run uvicorn app.main:app --reload
+uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 The API will be available at `http://localhost:8000`. You can access the interactive API documentation (Swagger UI) at `http://localhost:8000/docs`.
 
@@ -126,16 +125,16 @@ Ensure your models are imported in `app/models/init.py` for Alembic to detect th
 
 ### **Creating Migrations**
 ```bash
-python -m alembic revision --autogenerate -m "Add avatar url to users"
+uv run alembic revision --autogenerate -m "Add avatar url to users"
 ```
 ### **Migrate Head**
 ```bash
-alembic upgrade head
+uv run alembic upgrade head
 ```
 
 ### **Applying Migrations**
 ```bash
-python -m alembic upgrade head
+uv run alembic upgrade head
 ```
 
 ---
@@ -144,13 +143,13 @@ python -m alembic upgrade head
 
 ### **Running Tests**
 ```bash
-pytest
+uv run pytest
 ```
 
 ### **Test Coverage**
 Generate and view a coverage report:
 ```bash
-pytest tests/ -v --cov=app --cov-report=html --cov-report=term
+uv run pytest tests/ -v --cov=app --cov-report=html --cov-report=term
 # Open htmlcov/index.html in your browser
 ```
 
@@ -168,19 +167,16 @@ pytest tests/ -v --cov=app --cov-report=html --cov-report=term
 ## Linting & Formatting
 - **Black**: Enforce consistent code formatting.
 ```bash
-black .
+uv run black .
 ```
 - **isort**: Sort imports for readability.
 ```bash
-isort .
+uv run isort .
 ```
 - **ruff**: Linting for code quality and style.
 ```bash
-ruff .
-```
-```bash
-python -m ruff check .
-ruff format .
+uv run ruff check .
+uv run ruff format .
 ```
 
 ---

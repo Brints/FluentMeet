@@ -18,7 +18,7 @@ config:
   - changed-files:
     - any-glob-to-any-file:
       - 'pyproject.toml'
-      - 'requirements.txt'
+      - 'uv.lock'
       - '.env.example'
       - '.gitignore'
 

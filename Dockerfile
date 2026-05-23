@@ -5,13 +5,17 @@ FROM python:3.11-slim AS builder
 
 WORKDIR /build
 
+# Copy uv binary from the official image
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
 # System deps needed to compile psycopg2, cryptography, etc.
 RUN apt-get update && \
     apt-get install -y --no-install-recommends gcc libpq-dev && \
     rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir --prefix=/install -r requirements.txt
+# Sync dependencies to a virtual environment
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-dev
 
 # ============================================================
 # Stage 2 — Runtime: lean production image
@@ -28,8 +32,8 @@ RUN groupadd -r appuser && useradd -r -g appuser appuser
 
 WORKDIR /app
 
-# Copy installed packages from builder
-COPY --from=builder /install /usr/local
+# Copy the virtual environment from the builder
+COPY --from=builder /build/.venv /app/.venv
 
 # Copy application source
 COPY pyproject.toml ./
@@ -46,6 +50,9 @@ EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
+
+# Run using the python interpreter inside the virtual environment
+ENV PATH="/app/.venv/bin:$PATH"
 
 # Run with uvicorn — 4 workers for production
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
