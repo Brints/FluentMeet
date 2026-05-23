@@ -3,7 +3,7 @@
 # ============================================================
 FROM python:3.11-slim AS builder
 
-WORKDIR /build
+WORKDIR /app
 
 # Copy uv binary from the official image
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
@@ -33,7 +33,7 @@ RUN groupadd -r appuser && useradd -r -g appuser appuser
 WORKDIR /app
 
 # Copy the virtual environment from the builder
-COPY --from=builder /build/.venv /app/.venv
+COPY --from=builder /app/.venv /app/.venv
 
 # Copy application source
 COPY pyproject.toml ./
