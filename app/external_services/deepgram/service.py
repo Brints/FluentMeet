@@ -10,6 +10,7 @@ import time
 
 import httpx
 
+from app.core.circuit_breaker import AsyncCircuitBreaker
 from app.core.config import settings
 from app.external_services.deepgram.config import get_deepgram_headers
 
@@ -30,6 +31,7 @@ class DeepgramSTTService:
     def __init__(self, timeout: float = 10.0) -> None:
         self._timeout = timeout
         self._client: httpx.AsyncClient | None = None
+        self._breaker = AsyncCircuitBreaker()
 
     @property
     def client(self) -> httpx.AsyncClient:
@@ -69,14 +71,18 @@ class DeepgramSTTService:
             "smart_format": "true",
         }
 
+        async def _call() -> httpx.Response:
+            resp = await self.client.post(
+                settings.DEEPGRAM_API_URL,
+                headers=headers,
+                params=params,
+                content=audio_bytes,
+            )
+            resp.raise_for_status()
+            return resp
+
         start = time.monotonic()
-        response = await self.client.post(
-            settings.DEEPGRAM_API_URL,
-            headers=headers,
-            params=params,
-            content=audio_bytes,
-        )
-        response.raise_for_status()
+        response = await self._breaker.call(_call)
 
         elapsed_ms = (time.monotonic() - start) * 1000
         logger.debug("Deepgram STT completed in %.1fms", elapsed_ms)

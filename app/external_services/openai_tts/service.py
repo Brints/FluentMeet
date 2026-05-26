@@ -9,6 +9,7 @@ import time
 
 import httpx
 
+from app.core.circuit_breaker import AsyncCircuitBreaker
 from app.core.config import settings
 from app.external_services.openai_tts.config import get_openai_tts_headers
 
@@ -34,6 +35,7 @@ class OpenAITTSService:
     def __init__(self, timeout: float = 15.0) -> None:
         self._timeout = timeout
         self._client: httpx.AsyncClient | None = None
+        self._breaker = AsyncCircuitBreaker()
 
     @property
     def client(self) -> httpx.AsyncClient:
@@ -45,6 +47,7 @@ class OpenAITTSService:
         self,
         text: str,
         *,
+        language: str = "en",
         voice: str | None = None,
         encoding: str = "linear16",
     ) -> dict:
@@ -52,6 +55,7 @@ class OpenAITTSService:
 
         Args:
             text (str): The text to synthesize.
+            language (str): The language code of the text. Defaults to "en".
             voice (str | None): OpenAI voice ID
             (alloy, echo, fable, onyx, nova, shimmer). Defaults to None.
             encoding (str): Output encoding (``linear16`` or ``opus``).
@@ -67,20 +71,36 @@ class OpenAITTSService:
         headers = get_openai_tts_headers()
         response_format = _FORMAT_MAP.get(encoding, "pcm")
 
+        # OpenAI voices handle multilingual text natively.
+        # For non-English, prefer 'nova' for better multilingual quality.
+        selected_voice = voice or settings.OPENAI_TTS_VOICE
+        if language != "en" and not voice:
+            selected_voice = "nova"
+
         payload = {
             "model": settings.OPENAI_TTS_MODEL,
             "input": text,
-            "voice": voice or settings.OPENAI_TTS_VOICE,
+            "voice": selected_voice,
             "response_format": response_format,
         }
+        logger.debug(
+            "OpenAI TTS: lang=%s voice=%s format=%s",
+            language,
+            selected_voice,
+            response_format,
+        )
+
+        async def _call() -> httpx.Response:
+            resp = await self.client.post(
+                settings.OPENAI_TTS_API_URL,
+                headers=headers,
+                json=payload,
+            )
+            resp.raise_for_status()
+            return resp
 
         start = time.monotonic()
-        response = await self.client.post(
-            settings.OPENAI_TTS_API_URL,
-            headers=headers,
-            json=payload,
-        )
-        response.raise_for_status()
+        response = await self._breaker.call(_call)
 
         elapsed_ms = (time.monotonic() - start) * 1000
         logger.debug("OpenAI TTS completed in %.1fms", elapsed_ms)
