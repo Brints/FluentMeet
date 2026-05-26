@@ -5,6 +5,7 @@ from typing import Any
 import httpx
 from jinja2 import Environment, FileSystemLoader, TemplateNotFound
 
+from app.core.circuit_breaker import AsyncCircuitBreaker
 from app.core.config import settings
 from app.core.sanitize import sanitize_log_args
 from app.kafka.consumer import BaseConsumer
@@ -68,6 +69,14 @@ class MailgunEmailSender:
         self, timeout_seconds: float = settings.MAILGUN_TIMEOUT_SECONDS
     ) -> None:
         self._timeout_seconds = timeout_seconds
+        self._client: httpx.AsyncClient | None = None
+        self._breaker = AsyncCircuitBreaker()
+
+    @property
+    def client(self) -> httpx.AsyncClient:
+        if self._client is None or self._client.is_closed:
+            self._client = httpx.AsyncClient(timeout=self._timeout_seconds)
+        return self._client
 
     async def send(self, to: str, subject: str, html_body: str) -> None:
         """Dispatch an email payload to the Mailgun API.
@@ -77,7 +86,8 @@ class MailgunEmailSender:
             subject (str): The subject line of the email.
             html_body (str): The rendered HTML body content.
         """
-        if not settings.MAILGUN_API_KEY or not settings.MAILGUN_DOMAIN:
+        api_key = settings.MAILGUN_API_KEY
+        if not api_key or not settings.MAILGUN_DOMAIN:
             logger.warning("Mailgun credentials not configured; skipping dispatch")
             return
 
@@ -89,12 +99,14 @@ class MailgunEmailSender:
             "html": html_body,
         }
 
-        async with httpx.AsyncClient(timeout=self._timeout_seconds) as client:
-            response = await client.post(
+        async def _call() -> httpx.Response:
+            return await self.client.post(
                 endpoint,
                 data=payload,
-                auth=("api", settings.MAILGUN_API_KEY),
+                auth=("api", api_key),
             )
+
+        response = await self._breaker.call(_call)
 
         if response.status_code in {408, 425, 429} or response.status_code >= 500:
             raise TransientEmailDeliveryError(

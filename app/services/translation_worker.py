@@ -142,9 +142,11 @@ class TranslationWorker(BaseConsumer):
                 await self._publish_caption_to_redis(
                     room_id=payload.room_id,
                     speaker_id=payload.user_id,
-                    text=translated_text,
-                    language=target_lang,
-                    is_translation=True,
+                    original_text=payload.text,
+                    translated_text=translated_text,
+                    source_language=payload.source_language,
+                    target_language=target_lang,
+                    sequence_number=payload.sequence_number,
                 )
             except Exception as redis_err:
                 logger.warning("Redis caption publish failed: %s", redis_err)
@@ -232,23 +234,32 @@ class TranslationWorker(BaseConsumer):
         *,
         room_id: str,
         speaker_id: str,
-        text: str,
-        language: str,
-        is_translation: bool,
+        original_text: str,
+        translated_text: str,
+        source_language: str,
+        target_language: str,
+        sequence_number: int,
     ) -> None:
         """Publish a caption event to Redis Pub/Sub for real-time WebSocket delivery."""
         import json
 
         from app.modules.auth.token_store import _get_redis_client
 
+        participants = await self._state.get_participants(room_id)
+        speaker_name = participants.get(speaker_id, {}).get("display_name", "Speaker")
+
         redis = _get_redis_client()
         caption_msg = {
             "event": "caption",
+            "type": "translated",
             "speaker_id": speaker_id,
-            "text": text,
-            "language": language,
+            "speaker_name": speaker_name,
+            "original_text": original_text,
+            "translated_text": translated_text,
+            "source_language": source_language,
+            "target_language": target_language,
             "is_final": True,
-            "is_translation": is_translation,
+            "sequence_number": sequence_number,
             "timestamp_ms": int(time.time() * 1000),
         }
         await redis.publish(f"pipeline:captions:{room_id}", json.dumps(caption_msg))

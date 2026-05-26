@@ -15,6 +15,7 @@ from typing import Any
 from app.core.config import settings
 from app.external_services.openai_tts.service import get_openai_tts_service
 from app.external_services.voiceai.service import get_voiceai_tts_service
+from app.external_services.voiceai.websocket_streaming import get_voiceai_ws_tts_service
 from app.kafka.consumer import BaseConsumer
 from app.kafka.schemas import BaseEvent
 from app.kafka.topics import AUDIO_SYNTHESIZED, TEXT_TRANSLATED
@@ -69,8 +70,164 @@ class TTSWorker(BaseConsumer):
             )
             return
 
-        # 1. Call the configured TTS provider
         encoding = settings.PIPELINE_AUDIO_ENCODING
+        provider = settings.ACTIVE_TTS_PROVIDER.lower()
+        use_ws = provider == "voiceai" and settings.VOICEAI_USE_WEBSOCKET
+        use_streaming = (
+            provider == "voiceai" and settings.VOICEAI_USE_STREAMING and not use_ws
+        )
+
+        if use_ws:
+            await self._handle_ws_streaming(payload, text, encoding, pipeline_start)
+            return
+
+        if use_streaming:
+            await self._handle_http_streaming(payload, text, encoding, pipeline_start)
+            return
+
+        await self._handle_batch_synthesis(payload, text, encoding, pipeline_start)
+
+    async def _handle_ws_streaming(
+        self,
+        payload: Any,
+        text: str,
+        encoding: str,
+        pipeline_start: float,
+    ) -> None:
+        """Handle Voice.ai WebSocket multi-context streaming path."""
+        context_id = (
+            f"{payload.room_id}:{payload.target_language}:{payload.sequence_number}"
+        )
+        accumulated_bytes = bytearray()
+        sample_rate = 24000
+
+        async for chunk_data in get_voiceai_ws_tts_service().synthesize_stream(
+            text=text,
+            context_id=context_id,
+            language=payload.target_language,
+            encoding=encoding,
+        ):
+            chunk_bytes = chunk_data["audio_bytes"]
+            sample_rate = chunk_data["sample_rate"]
+            accumulated_bytes.extend(chunk_bytes)
+
+            chunk_b64 = base64.b64encode(chunk_bytes).decode("ascii")
+            synth_payload = SynthesizedAudioPayload(
+                room_id=payload.room_id,
+                user_id=payload.user_id,
+                sequence_number=payload.sequence_number,
+                audio_data=chunk_b64,
+                target_language=payload.target_language,
+                sample_rate=sample_rate,
+                encoding=AudioEncoding(encoding),
+            )
+            synth_event = SynthesizedAudioEvent(payload=synth_payload)
+            try:
+                await self._publish_audio_to_redis(synth_event)
+            except Exception as redis_err:
+                logger.warning("Redis audio egress publish failed: %s", redis_err)
+
+        if accumulated_bytes:
+            full_audio_b64 = base64.b64encode(accumulated_bytes).decode("ascii")
+            final_payload = SynthesizedAudioPayload(
+                room_id=payload.room_id,
+                user_id=payload.user_id,
+                sequence_number=payload.sequence_number,
+                audio_data=full_audio_b64,
+                target_language=payload.target_language,
+                sample_rate=sample_rate,
+                encoding=AudioEncoding(encoding),
+            )
+            final_event = SynthesizedAudioEvent(payload=final_payload)
+            await self._producer.send(
+                AUDIO_SYNTHESIZED, final_event, key=payload.room_id
+            )
+
+            elapsed_ms = (time.monotonic() - pipeline_start) * 1000
+            logger.info(
+                "TTS (WS Final): seq=%d room=%s lang=%s "
+                "provider=%s audio_size=%d latency=%.1fms",
+                payload.sequence_number,
+                payload.room_id,
+                payload.target_language,
+                settings.ACTIVE_TTS_PROVIDER,
+                len(accumulated_bytes),
+                elapsed_ms,
+            )
+
+    async def _handle_http_streaming(
+        self,
+        payload: Any,
+        text: str,
+        encoding: str,
+        pipeline_start: float,
+    ) -> None:
+        """Handle Voice.ai HTTP streaming path."""
+        accumulated_bytes = bytearray()
+        sample_rate = 24000
+
+        async for chunk_data in get_voiceai_tts_service().synthesize_stream(
+            text=text,
+            language=payload.target_language,
+            encoding=encoding,
+        ):
+            chunk_bytes = chunk_data["audio_bytes"]
+            sample_rate = chunk_data["sample_rate"]
+            accumulated_bytes.extend(chunk_bytes)
+
+            chunk_b64 = base64.b64encode(chunk_bytes).decode("ascii")
+            synth_payload = SynthesizedAudioPayload(
+                room_id=payload.room_id,
+                user_id=payload.user_id,
+                sequence_number=payload.sequence_number,
+                audio_data=chunk_b64,
+                target_language=payload.target_language,
+                sample_rate=sample_rate,
+                encoding=AudioEncoding(encoding),
+            )
+            synth_event = SynthesizedAudioEvent(payload=synth_payload)
+            try:
+                await self._publish_audio_to_redis(synth_event)
+            except Exception as redis_err:
+                logger.warning("Redis audio egress publish failed: %s", redis_err)
+
+        if accumulated_bytes:
+            full_audio_b64 = base64.b64encode(accumulated_bytes).decode("ascii")
+            final_payload = SynthesizedAudioPayload(
+                room_id=payload.room_id,
+                user_id=payload.user_id,
+                sequence_number=payload.sequence_number,
+                audio_data=full_audio_b64,
+                target_language=payload.target_language,
+                sample_rate=sample_rate,
+                encoding=AudioEncoding(encoding),
+            )
+            final_event = SynthesizedAudioEvent(payload=final_payload)
+            await self._producer.send(
+                AUDIO_SYNTHESIZED, final_event, key=payload.room_id
+            )
+
+            elapsed_ms = (time.monotonic() - pipeline_start) * 1000
+            logger.info(
+                "TTS (Stream Final): seq=%d room=%s lang=%s "
+                "provider=%s audio_size=%d latency=%.1fms",
+                payload.sequence_number,
+                payload.room_id,
+                payload.target_language,
+                settings.ACTIVE_TTS_PROVIDER,
+                len(accumulated_bytes),
+                elapsed_ms,
+            )
+
+    async def _handle_batch_synthesis(
+        self,
+        payload: Any,
+        text: str,
+        encoding: str,
+        pipeline_start: float,
+    ) -> None:
+        """Handle standard non-streaming batch synthesis path."""
+        # 1. Call the configured TTS provider (Non-streaming)
         audio_result = await self._synthesize(
             text=text,
             language=payload.target_language,
@@ -135,7 +292,9 @@ class TTSWorker(BaseConsumer):
             )
 
         # Default: OpenAI
-        return await get_openai_tts_service().synthesize(text, encoding=encoding)
+        return await get_openai_tts_service().synthesize(
+            text, language=language, encoding=encoding
+        )
 
     async def _publish_audio_to_redis(self, synth_event: SynthesizedAudioEvent) -> None:
         """Publish synthesized audio to Redis Pub/Sub for WebSocket egress."""

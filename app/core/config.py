@@ -79,6 +79,10 @@ class Settings(BaseSettings):
     # AI Pipeline — STT (Deepgram)
     DEEPGRAM_MODEL: str = "nova-2"
     DEEPGRAM_API_URL: str = "https://api.deepgram.com/v1/listen"
+    DEEPGRAM_STREAMING_URL: str = "wss://api.deepgram.com/v1/listen"
+    DEEPGRAM_INTERIM_RESULTS: bool = True
+    DEEPGRAM_ENDPOINTING_MS: int = 300
+    DEEPGRAM_USE_STREAMING: bool = True
 
     # AI Pipeline — Translation (DeepL)
     DEEPL_API_URL: str = "https://api-free.deepl.com/v2/translate"
@@ -91,9 +95,14 @@ class Settings(BaseSettings):
     # AI Pipeline — TTS (Voice.ai)
     VOICEAI_TTS_MODEL: str = "voiceai-tts-multilingual-v1-latest"
     VOICEAI_TTS_API_URL: str = "https://dev.voice.ai/api/v1/tts/speech"
+    VOICEAI_TTS_STREAM_URL: str = "https://dev.voice.ai/api/v1/tts/speech/stream"
+    VOICEAI_USE_STREAMING: bool = True
+    VOICEAI_WS_URL: str = "wss://dev.voice.ai/api/v1/tts/multi-stream"
+    VOICEAI_DELIVERY_MODE: str = "paced"  # "paced" or "raw"
+    VOICEAI_USE_WEBSOCKET: bool = False  # Feature flag for WebSocket TTS
 
     # AI Pipeline — Audio Settings
-    PIPELINE_AUDIO_SAMPLE_RATE: int = 16000
+    PIPELINE_AUDIO_SAMPLE_RATE: int = 24000
     PIPELINE_AUDIO_ENCODING: str = "linear16"  # "linear16" or "opus"
     ACTIVE_TTS_PROVIDER: str = "openai"  # "openai" or "voiceai"
 

@@ -9,9 +9,11 @@ API Reference: https://voice.ai/docs/api-reference/text-to-speech/generate-speec
 
 import logging
 import time
+from collections.abc import AsyncGenerator
 
 import httpx
 
+from app.core.circuit_breaker import AsyncCircuitBreaker
 from app.core.config import settings
 from app.external_services.voiceai.config import get_voiceai_headers
 
@@ -19,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 # Map our internal encoding names to Voice.ai audio_format values
 _FORMAT_MAP = {
-    "linear16": "pcm_16000",
+    "linear16": "pcm_24000",
     "opus": "opus_48000_64",
 }
 
@@ -37,6 +39,7 @@ class VoiceAITTSService:
     def __init__(self, timeout: float = 60.0) -> None:
         self._timeout = timeout
         self._client: httpx.AsyncClient | None = None
+        self._breaker = AsyncCircuitBreaker()
 
     @property
     def client(self) -> httpx.AsyncClient:
@@ -70,11 +73,13 @@ class VoiceAITTSService:
             httpx.HTTPStatusError: On non-2xx responses from Voice.ai.
         """
         headers = get_voiceai_headers()
-        audio_format = _FORMAT_MAP.get(encoding, "pcm_16000")
+        audio_format = _FORMAT_MAP.get(encoding, "pcm_24000")
 
         # Determine sample rate from the format string
         sample_rate = 16000
-        if "48000" in audio_format:
+        if "24000" in audio_format:
+            sample_rate = 24000
+        elif "48000" in audio_format:
             sample_rate = 48000
 
         # Select model: multilingual for non-English, standard for English
@@ -94,13 +99,17 @@ class VoiceAITTSService:
         if voice_id:
             payload["voice_id"] = voice_id
 
+        async def _call() -> httpx.Response:
+            resp = await self.client.post(
+                settings.VOICEAI_TTS_API_URL,
+                headers=headers,
+                json=payload,
+            )
+            resp.raise_for_status()
+            return resp
+
         start = time.monotonic()
-        response = await self.client.post(
-            settings.VOICEAI_TTS_API_URL,
-            headers=headers,
-            json=payload,
-        )
-        response.raise_for_status()
+        response = await self._breaker.call(_call)
 
         elapsed_ms = (time.monotonic() - start) * 1000
         logger.debug("Voice.ai TTS API completed in %.1fms", elapsed_ms)
@@ -110,6 +119,71 @@ class VoiceAITTSService:
             "sample_rate": sample_rate,
             "latency_ms": round(elapsed_ms, 1),
         }
+
+    async def synthesize_stream(
+        self,
+        text: str,
+        *,
+        language: str = "en",
+        voice_id: str | None = None,
+        encoding: str = "linear16",
+    ) -> AsyncGenerator[dict, None]:
+        """Stream TTS audio chunks via Voice.ai streaming endpoint.
+
+        Args:
+            text (str): The text to synthesize.
+            language (str): ISO 639-1 language code. Defaults to "en".
+            voice_id (str | None): Optional Voice.ai voice ID.
+            encoding (str): Output encoding ("linear16" or "opus").
+                Defaults to "linear16".
+
+        Yields:
+            dict: A dictionary containing "audio_bytes" and "sample_rate".
+        """
+        headers = get_voiceai_headers()
+        audio_format = _FORMAT_MAP.get(encoding, "pcm_24000")
+
+        # Determine sample rate from the format string
+        sample_rate = 16000
+        if "24000" in audio_format:
+            sample_rate = 24000
+        elif "48000" in audio_format:
+            sample_rate = 48000
+
+        # Select model: multilingual for non-English, standard for English
+        model = settings.VOICEAI_TTS_MODEL
+        if language == "en" and "multilingual" in model:
+            model = model.replace("multilingual-", "")
+
+        payload: dict = {
+            "text": text,
+            "audio_format": audio_format,
+            "model": model,
+            "language": language,
+            "temperature": 1,
+            "top_p": 0.8,
+        }
+        logger.debug("Voice.ai Streaming Audio format: %s", audio_format)
+        if voice_id:
+            payload["voice_id"] = voice_id
+
+        start = time.monotonic()
+        async with self.client.stream(
+            "POST",
+            settings.VOICEAI_TTS_STREAM_URL,
+            headers=headers,
+            json=payload,
+        ) as response:
+            response.raise_for_status()
+            elapsed_ms = (time.monotonic() - start) * 1000
+            logger.debug("Voice.ai TTS Stream initiated in %.1fms", elapsed_ms)
+
+            async for chunk in response.aiter_bytes(chunk_size=4096):
+                if chunk:
+                    yield {
+                        "audio_bytes": chunk,
+                        "sample_rate": sample_rate,
+                    }
 
 
 # ── Module-level singleton ────────────────────────────────────────────

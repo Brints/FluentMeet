@@ -21,6 +21,38 @@ from app.modules.meeting.constants import (
 
 logger = logging.getLogger(__name__)
 
+VALID_LANGUAGES = {
+    "en",
+    "de",
+    "fr",
+    "es",
+    "it",
+    "pt",
+    "nl",
+    "pl",
+    "ru",
+    "ja",
+    "zh",
+    "ko",
+    "sv",
+    "da",
+    "fi",
+    "el",
+    "cs",
+    "ro",
+    "hu",
+    "uk",
+    "id",
+    "tr",
+}
+
+
+def _validate_language(code: str) -> str:
+    cleaned = code.strip().lower()
+    if cleaned not in VALID_LANGUAGES:
+        raise ValueError(f"Unsupported language code: {code}")
+    return cleaned
+
 
 class MeetingStateService:
     """Manages ephemeral live room state (lobby, participants, active speaker)
@@ -55,6 +87,8 @@ class MeetingStateService:
             display_name: The participant's display name.
             role: The participant's role (host, guest, participant).
         """
+        language = _validate_language(language)
+        speaking_language = _validate_language(speaking_language)
         state = {
             "status": "connected",
             "language": language,
@@ -108,6 +142,8 @@ class MeetingStateService:
         speaking_language: str = "en",
     ) -> None:
         """Place a user in the waiting room/lobby hash."""
+        language = _validate_language(language)
+        speaking_language = _validate_language(speaking_language)
         state = {
             "display_name": display_name,
             "language": language,

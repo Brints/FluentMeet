@@ -77,6 +77,7 @@ async def test_stt_worker_handle(mock_producer, base_audio_chunk_event):
         patch("app.modules.auth.token_store._get_redis_client") as mock_get_redis,
     ):
         mock_settings.DEEPGRAM_API_KEY = "fake-key"
+        mock_settings.DEEPGRAM_USE_STREAMING = False
 
         mock_stt_svc = AsyncMock()
         mock_stt_svc.transcribe.return_value = {
@@ -93,6 +94,12 @@ async def test_stt_worker_handle(mock_producer, base_audio_chunk_event):
         cm_mock = MagicMock()
         cm_mock.broadcast_to_room = AsyncMock()
         mock_get_cm.return_value = cm_mock
+
+        mock_state = AsyncMock()
+        mock_state.get_participants.return_value = {
+            "user456": {"display_name": "Speaker Name"}
+        }
+        worker._state = mock_state
 
         for _ in range(STTWorker.BUFFER_SIZE):
             await worker.handle(base_audio_chunk_event)
@@ -198,6 +205,7 @@ async def test_tts_worker_handle(mock_producer, base_translation_event):
 
         mock_openai.synthesize.assert_called_once_with(
             "Bonjour le monde",
+            language="fr",
             encoding="linear16",
         )
 
@@ -211,3 +219,104 @@ async def test_tts_worker_handle(mock_producer, base_translation_event):
 
         decoded = base64.b64decode(synth_event.payload.audio_data)
         assert decoded == b"synthetic_audio_bytes"
+
+
+@pytest.mark.asyncio
+async def test_tts_worker_handle_voiceai_streaming(
+    mock_producer, base_translation_event
+):
+    from app.services.tts_worker import TTSWorker
+
+    worker = TTSWorker(producer=mock_producer)
+
+    with (
+        patch("app.services.tts_worker.get_voiceai_tts_service") as mock_get_voiceai,
+        patch("app.services.tts_worker.settings") as mock_settings,
+        patch("app.modules.auth.token_store._get_redis_client") as mock_get_redis,
+    ):
+        mock_settings.ACTIVE_TTS_PROVIDER = "voiceai"
+        mock_settings.VOICEAI_USE_WEBSOCKET = False
+        mock_settings.VOICEAI_USE_STREAMING = True
+        mock_settings.PIPELINE_AUDIO_ENCODING = "linear16"
+
+        mock_voiceai = AsyncMock()
+
+        # mock streaming generator
+        async def mock_generator(*_args, **_kwargs):
+            yield {"audio_bytes": b"chunk1", "sample_rate": 24000}
+            yield {"audio_bytes": b"chunk2", "sample_rate": 24000}
+
+        mock_voiceai.synthesize_stream = mock_generator
+        mock_get_voiceai.return_value = mock_voiceai
+
+        redis_mock = MagicMock()
+        redis_mock.publish = AsyncMock()
+        mock_get_redis.return_value = redis_mock
+
+        await worker.handle(base_translation_event)
+
+        # Verify Redis publish was called for each chunk (2 times)
+        assert redis_mock.publish.call_count == 2
+
+        # Verify Kafka publish at the end with full accumulated audio
+        mock_producer.send.assert_called_once()
+        args, _kwargs = mock_producer.send.call_args
+        assert args[0] == "audio.synthesized"
+
+        synth_event = args[1]
+        assert synth_event.payload.sample_rate == 24000
+        assert synth_event.payload.target_language == "fr"
+
+        decoded = base64.b64decode(synth_event.payload.audio_data)
+        assert decoded == b"chunk1chunk2"
+
+
+@pytest.mark.asyncio
+async def test_tts_worker_handle_voiceai_websocket(
+    mock_producer, base_translation_event
+):
+    from app.services.tts_worker import TTSWorker
+
+    worker = TTSWorker(producer=mock_producer)
+
+    with (
+        patch(
+            "app.services.tts_worker.get_voiceai_ws_tts_service"
+        ) as mock_get_ws_voiceai,
+        patch("app.services.tts_worker.settings") as mock_settings,
+        patch("app.modules.auth.token_store._get_redis_client") as mock_get_redis,
+    ):
+        mock_settings.ACTIVE_TTS_PROVIDER = "voiceai"
+        mock_settings.VOICEAI_USE_WEBSOCKET = True
+        mock_settings.PIPELINE_AUDIO_ENCODING = "linear16"
+
+        mock_voiceai_ws = AsyncMock()
+
+        # mock streaming generator
+        async def mock_generator(*_args, **_kwargs):
+            yield {"audio_bytes": b"chunk1", "sample_rate": 24000}
+            yield {"audio_bytes": b"chunk2", "sample_rate": 24000}
+
+        mock_voiceai_ws.synthesize_stream = mock_generator
+        mock_get_ws_voiceai.return_value = mock_voiceai_ws
+
+        redis_mock = MagicMock()
+        redis_mock.publish = AsyncMock()
+        mock_get_redis.return_value = redis_mock
+
+        await worker.handle(base_translation_event)
+
+        # Verify Redis publish was called for each chunk (2 times)
+        assert redis_mock.publish.call_count == 2
+
+        # Verify Kafka publish at the end with full accumulated audio
+        mock_producer.send.assert_called_once()
+        args, _kwargs = mock_producer.send.call_args
+        assert args[0] == "audio.synthesized"
+
+        synth_event = args[1]
+        assert synth_event.payload.sample_rate == 24000
+        assert synth_event.payload.target_language == "fr"
+
+        decoded = base64.b64decode(synth_event.payload.audio_data)
+        assert decoded == b"chunk1chunk2"
