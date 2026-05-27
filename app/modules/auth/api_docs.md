@@ -23,6 +23,7 @@
   - [POST /refresh-token](#post-refresh-token)
   - [GET /google/login](#get-googlelogin)
   - [GET /google/callback](#get-googlecallback)
+  - [POST /google/exchange](#post-googleexchange)
 - [Data Models](#data-models)
 - [Request / Response Schemas](#request--response-schemas)
 - [Error Codes Reference](#error-codes-reference)
@@ -33,7 +34,7 @@
 
 ## Overview
 
-The FluentMeet authentication module provides a complete identity and access management system built on **FastAPI**. It supports:
+The SpokenAI authentication module provides a complete identity and access management system built on **FastAPI**. It supports:
 
 - **Email/password registration** with mandatory email verification.
 - **Google OAuth 2.0** social login with automatic account linking.
@@ -147,7 +148,7 @@ Client                          Server                     Redis
   │  ◄── 401 REFRESH_TOKEN_REUSE │                          │
 ```
 
-### Google OAuth 2.0 Flow
+### Google OAuth 2.0 Flow (Secure Code Exchange)
 
 ```
 Client                          Server                     Google
@@ -167,8 +168,15 @@ Client                          Server                     Google
   │                               │── Get user info ─────────►│
   │                               │  ◄── {email, name, ...}  │
   │                               │── Find or create user    │
-  │                               │── Issue AT + RT          │
-  │  ◄── 302 → frontend#access_token=...                    │
+  │                               │── Store login payload    │
+  │                               │   in Redis (5min TTL)    │
+  │  ◄── 302 → frontend/oauth-callback?code={exchange_code}  │
+  │                               │                          │
+  │  POST /google/exchange        │                          │
+  │  {code: exchange_code}   ──►  │                          │
+  │                               │── Atomically get & delete│
+  │                               │   tokens from Redis      │
+  │  ◄── 200 {access_token, ...}  │                          │
   │  ◄── Set-Cookie: refresh_token│                          │
 ```
 
@@ -227,6 +235,9 @@ All sensitive endpoints are rate-limited using **SlowAPI** (based on client IP):
 | `POST /change-password`     | 10/minute |
 | `POST /logout`              | 20/minute |
 | `POST /refresh-token`       | 30/minute |
+| `GET /google/login`         | 10/minute |
+| `GET /google/callback`      | 10/minute |
+| `POST /google/exchange`     | 20/minute |
 
 ### Cookie Security
 
@@ -665,7 +676,7 @@ Redirects to Google's OAuth consent URL with:
 
 ### GET /google/callback
 
-Handle the callback from Google after user authentication. This endpoint is called by Google, not by the client directly.
+Handle the callback from Google after user authentication. This endpoint is invoked by the browser redirect from Google, not by the client directly via AJAX.
 
 **Query Parameters:**
 
@@ -676,7 +687,58 @@ Handle the callback from Google after user authentication. This endpoint is call
 
 **Response: `302 Found`**
 
-Redirects to: `{FRONTEND_BASE_URL}#access_token=<jwt>`
+Redirects to: `{FRONTEND_BASE_URL}/oauth-callback?code=<exchange_code>`
+
+**Error Responses:**
+
+During the redirect callback, if an error occurs, it is returned as a JSON error response or standard HTTP error page:
+
+| Status | Code                       | Condition                                                |
+|--------|----------------------------|----------------------------------------------------------|
+| `400`  | `INVALID_OAUTH_STATE`      | State token is invalid or expired                        |
+| `400`  | `INVALID_OAUTH_PROFILE`    | Google account does not provide a verified email address |
+| `403`  | `ACCOUNT_LOCKED`           | Account is locked due to failed attempts                 |
+| `403`  | `ACCOUNT_DEACTIVATED`      | Account is deactivated or deleted                        |
+| `409`  | `GOOGLE_ID_ALREADY_LINKED` | Google account is already linked to another user account |
+| `502`  | `OAUTH_PROVIDER_ERROR`     | Failed to communicate with Google                        |
+
+**User Resolution Logic:**
+1. If a user with the `google_id` exists:
+   - If a user with the email exists and has a different user ID, raises `GOOGLE_ID_ALREADY_LINKED` (409 Conflict).
+   - Otherwise, resolve user.
+2. If a user with the email exists but `google_id` is empty:
+   - Links the Google ID, updates avatar if missing, and marks email verified.
+3. If no user exists:
+   - Creates a new verified user with a random hashed password, sets `google_id`, `full_name`, and `avatar_url`.
+
+---
+
+### POST /google/exchange
+
+Exchange the short-lived single-use exchange code received from the callback redirection for the user's JWT access token and set the secure `refresh_token` cookie.
+
+**Request Body:**
+
+```json
+{
+  "code": "4V_T2gq_Y-S..."
+}
+```
+
+| Field  | Type     | Required | Constraints                    |
+|--------|----------|----------|--------------------------------|
+| `code` | `string` | ✅        | Non-empty exchange code string |
+
+**Response: `200 OK`**
+
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIs...",
+  "user_id": "550e8400-e29b-41d4-a716-446655440000",
+  "token_type": "bearer",
+  "expires_in": 3600
+}
+```
 
 **Response Headers:**
 
@@ -686,22 +748,9 @@ Set-Cookie: refresh_token=<rt>; HttpOnly; Secure; SameSite=Strict; Path=/api/v1/
 
 **Error Responses:**
 
-| Status | Code                    | Condition                                |
-|--------|-------------------------|------------------------------------------|
-| `400`  | `INVALID_OAUTH_STATE`   | State token is invalid or expired        |
-| `400`  | `INVALID_OAUTH_PROFILE` | Google account does not provide an email |
-| `403`  | `ACCOUNT_LOCKED`        | Account is locked due to failed attempts |
-| `403`  | `ACCOUNT_DEACTIVATED`   | Account is deactivated or deleted        |
-| `502`  | `OAUTH_PROVIDER_ERROR`  | Failed to communicate with Google        |
-
-**User Resolution Logic:**
-1. If a user with the email exists:
-   - Links the Google ID if not already linked.
-   - Sets avatar URL if missing.
-   - Auto-verifies the email if not already verified.
-2. If no user exists:
-   - Creates a new verified user with a random hashed password.
-   - Sets `google_id`, `full_name`, and `avatar_url` from the Google profile.
+| Status | Code                    | Condition                                         |
+|--------|-------------------------|---------------------------------------------------|
+| `400`  | `INVALID_EXCHANGE_CODE` | The exchange code is invalid, reused, or expired. |
 
 ---
 
@@ -780,6 +829,7 @@ Set-Cookie: refresh_token=<rt>; HttpOnly; Secure; SameSite=Strict; Path=/api/v1/
 | `ForgotPasswordRequest`     | `POST /forgot-password`     | `email`                                                                                                                                       |
 | `ResetPasswordRequest`      | `POST /reset-password`      | `token` (min 1), `new_password` (min 8)                                                                                                       |
 | `ChangePasswordRequest`     | `POST /change-password`     | `current_password`, `new_password` (min 8)                                                                                                    |
+| `GoogleExchangeRequest`     | `POST /google/exchange`     | `code` (non-empty)                                                                                                                            |
 
 ### Response Schemas
 
@@ -829,6 +879,8 @@ All errors follow a consistent JSON structure:
 | `INVALID_OAUTH_STATE`      | 400         | `/google/callback`                               | CSRF state token invalid or expired              |
 | `INVALID_OAUTH_PROFILE`    | 400         | `/google/callback`                               | Google profile missing email address             |
 | `OAUTH_PROVIDER_ERROR`     | 502         | `/google/callback`                               | Failed to communicate with Google APIs           |
+| `INVALID_EXCHANGE_CODE`    | 400         | `/google/exchange`                               | The exchange code is invalid, reused, or expired |
+| `GOOGLE_ID_ALREADY_LINKED` | 409         | `/google/callback`                               | Google account is already linked to another user account |
 
 ---
 
@@ -1014,4 +1066,15 @@ curl -X POST http://localhost:8000/api/v1/auth/change-password \
 curl -X POST http://localhost:8000/api/v1/auth/logout \
   -H "Authorization: Bearer <access_token>" \
   -b cookies.txt
+```
+
+### cURL: Exchange Google OAuth Code
+
+```bash
+curl -X POST http://localhost:8000/api/v1/auth/google/exchange \
+  -H "Content-Type: application/json" \
+  -c cookies.txt \
+  -d '{
+    "code": "4V_T2gq_Y-S..."
+  }'
 ```
