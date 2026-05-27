@@ -26,6 +26,7 @@ from app.modules.auth.schemas import (
     ActionAcknowledgement,
     ChangePasswordRequest,
     ForgotPasswordRequest,
+    GoogleExchangeRequest,
     LoginRequest,
     LoginResponse,
     RefreshTokenResponse,
@@ -386,12 +387,16 @@ async def refresh_token(
     summary="Initiate Google OAuth 2.0 login flow",
     status_code=status.HTTP_302_FOUND,
 )
+@limiter.limit("10/minute")
 async def google_login(
+    request: Request,
     google_oauth: GoogleOAuthService = Depends(get_google_oauth_service),
 ) -> RedirectResponse:
     import secrets
 
     from app.modules.auth.token_store import _get_redis_client
+
+    del request  # consumed by slowapi
 
     state = secrets.token_urlsafe(32)
     redis = _get_redis_client()
@@ -405,14 +410,21 @@ async def google_login(
     "/google/callback",
     summary="Google OAuth 2.0 callback endpoint",
 )
+@limiter.limit("10/minute")
 async def google_callback(
+    request: Request,
     code: str,
     state: str,
     google_oauth: GoogleOAuthService = Depends(get_google_oauth_service),
     auth_service: AuthService = Depends(get_auth_service),
 ) -> RedirectResponse:
+    import json
+    import secrets
+
     from app.core.exceptions import BadRequestException
     from app.modules.auth.token_store import _get_redis_client
+
+    del request  # consumed by slowapi
 
     redis = _get_redis_client()
     state_key = f"oauth_state:{state}"
@@ -431,10 +443,11 @@ async def google_callback(
     user_info = await google_oauth.get_user_info(access_token=access_token)
 
     email = user_info.get("email")
-    if not email:
+    email_verified = user_info.get("email_verified", False)
+    if not email or not email_verified:
         raise BadRequestException(
             code="INVALID_OAUTH_PROFILE",
-            message="Google account does not provide an email address.",
+            message="Google account does not provide a verified email address.",
         )
 
     google_id = str(user_info.get("sub", ""))
@@ -449,22 +462,82 @@ async def google_callback(
         avatar_url=avatar,
     )
 
-    # 4. Return tokens (Cookie & Redirect with access token)
-    # Using URL fragment as requested by the user
-    redirect_url = (
-        f"{settings.FRONTEND_BASE_URL}#access_token={login_response.access_token}"
+    # 4. Generate temporary exchange code and store tokens securely in Redis
+    exchange_code = secrets.token_urlsafe(32)
+    exchange_data = {
+        "access_token": login_response.access_token,
+        "user_id": str(login_response.user_id),
+        "token_type": login_response.token_type,
+        "expires_in": login_response.expires_in,
+        "refresh_token": refresh_token,
+        "refresh_ttl": refresh_ttl,
+    }
+    await redis.set(
+        f"oauth_exchange:{exchange_code}",
+        json.dumps(exchange_data),
+        ex=300,  # 5 minutes TTL
     )
-    response = RedirectResponse(url=redirect_url, status_code=302)
+
+    # 5. Redirect to frontend with exchange code
+    redirect_url = f"{settings.FRONTEND_BASE_URL}/oauth-callback?code={exchange_code}"
+    return RedirectResponse(url=redirect_url, status_code=302)
+
+
+@router.post(
+    "/google/exchange",
+    response_model=LoginResponse,
+    summary="Exchange temporary OAuth code for access token",
+    description=(
+        "Exchanges a short-lived authorization code retrieved from Google Callback "
+        "for the user's access token and sets the HttpOnly refresh token cookie."
+    ),
+)
+@limiter.limit("20/minute")
+async def google_exchange(
+    request: Request,
+    payload: GoogleExchangeRequest,
+) -> JSONResponse:
+    import json
+
+    from app.core.exceptions import BadRequestException
+    from app.modules.auth.token_store import _get_redis_client
+
+    del request  # consumed by slowapi
+
+    redis = _get_redis_client()
+    exchange_key = f"oauth_exchange:{payload.code}"
+
+    # Atomic retrieve-and-delete prevents TOCTOU race conditions
+    data_str = await redis.getdel(exchange_key)
+    if not data_str:
+        raise BadRequestException(
+            code="INVALID_EXCHANGE_CODE",
+            message="OAuth exchange code is invalid or has expired.",
+        )
+
+    data = json.loads(data_str)
+
+    login_response = LoginResponse(
+        access_token=data["access_token"],
+        user_id=data["user_id"],
+        token_type=data["token_type"],
+        expires_in=data["expires_in"],
+    )
+
+    res = JSONResponse(
+        content=login_response.model_dump(mode="json"),
+        status_code=200,
+    )
 
     # Set HttpOnly refresh-token cookie
-    response.set_cookie(
+    res.set_cookie(
         key="refresh_token",
-        value=refresh_token,
+        value=data["refresh_token"],
         httponly=True,
         secure=True,
         samesite="strict",
         path=f"{settings.API_V1_STR}/auth",
-        max_age=refresh_ttl,
+        max_age=data["refresh_ttl"],
     )
 
-    return response
+    return res

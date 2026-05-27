@@ -358,6 +358,80 @@ class AuthService:
 
         return body, new_refresh_token, new_ttl
 
+    def _find_oauth_user(self, email: str, google_id: str) -> User | None:
+        user_by_google = None
+        if google_id:
+            user_by_google = self.db.execute(
+                select(User).where(User.google_id == google_id)
+            ).scalar_one_or_none()
+
+        user_by_email = self.get_user_by_email(email)
+
+        if user_by_google:
+            # Check for conflict if Google ID is linked to account A,
+            # but current email is account B
+            if user_by_email and user_by_email.id != user_by_google.id:
+                raise ConflictException(
+                    code="GOOGLE_ID_ALREADY_LINKED",
+                    message=(
+                        "This Google account is already linked to "
+                        "another FluentMeet account."
+                    ),
+                )
+            return user_by_google
+        return user_by_email
+
+    async def _check_oauth_user_status(self, user: User) -> None:
+        # Check lockout
+        if await self.lockout_svc.is_locked(user.email):
+            raise ForbiddenException(
+                code="ACCOUNT_LOCKED",
+                message="Account is temporarily locked. Please try again later.",
+            )
+
+        # Verify if user is active
+        if user.deleted_at is not None or not user.is_active:
+            raise ForbiddenException(
+                code="ACCOUNT_DEACTIVATED",
+                message="This account has been deactivated or deleted.",
+            )
+
+    def _update_oauth_user_profile(
+        self, user: User, google_id: str, avatar_url: str | None
+    ) -> None:
+        updated = False
+        if not user.google_id:
+            user.google_id = google_id
+            updated = True
+        if not user.avatar_url and avatar_url:
+            user.avatar_url = avatar_url
+            updated = True
+        if not user.is_verified:
+            user.is_verified = True
+            updated = True
+
+        if updated:
+            self.db.commit()
+            self.db.refresh(user)
+
+    def _create_oauth_user(
+        self, email: str, google_id: str, name: str | None, avatar_url: str | None
+    ) -> User:
+        random_password = str(uuid.uuid4())
+        user = User(
+            email=email,
+            hashed_password=self.security_service.hash_password(random_password),
+            full_name=name,
+            avatar_url=avatar_url,
+            google_id=google_id,
+            is_active=True,
+            is_verified=True,
+        )
+        self.db.add(user)
+        self.db.commit()
+        self.db.refresh(user)
+        return user
+
     async def resolve_oauth_user(
         self, email: str, google_id: str, name: str | None, avatar_url: str | None
     ) -> tuple[LoginResponse, str, int]:
@@ -374,59 +448,25 @@ class AuthService:
                 and TTL in seconds.
         """
         email = email.lower()
-        user = self.get_user_by_email(email)
+        user = self._find_oauth_user(email, google_id)
 
         if user:
-            # Check lockout
-            if await self.lockout_svc.is_locked(email):
-                raise ForbiddenException(
-                    code="ACCOUNT_LOCKED",
-                    message="Account is temporarily locked. Please try again later.",
-                )
-
-            # Verify if user is active
-            if user.deleted_at is not None or not user.is_active:
-                raise ForbiddenException(
-                    code="ACCOUNT_DEACTIVATED",
-                    message="This account has been deactivated or deleted.",
-                )
-
-            # Link account if not linked
-            if not user.google_id:
-                user.google_id = google_id
-            if not user.avatar_url and avatar_url:
-                user.avatar_url = avatar_url
-            if not user.is_verified:
-                user.is_verified = True
-
-            self.db.commit()
-            self.db.refresh(user)
+            await self._check_oauth_user_status(user)
+            self._update_oauth_user_profile(user, google_id, avatar_url)
         else:
-            # Create new user
-            random_password = str(uuid.uuid4())
-            user = User(
-                email=email,
-                hashed_password=self.security_service.hash_password(random_password),
-                full_name=name,
-                avatar_url=avatar_url,
-                google_id=google_id,
-                is_active=True,
-                is_verified=True,
-            )
-            self.db.add(user)
-            self.db.commit()
-            self.db.refresh(user)
+            user = self._create_oauth_user(email, google_id, name, avatar_url)
 
-        # Issue tokens for successful OAuth login
+        # Issue tokens for successful OAuth login (use user.email, not the
+        # Google-provided email, in case user_by_google has a different stored email)
         access_token, expires_in = self.security_service.create_access_token(
-            email=email
+            email=user.email
         )
         refresh_token, refresh_jti, refresh_ttl = (
-            self.security_service.create_refresh_token(email=email)
+            self.security_service.create_refresh_token(email=user.email)
         )
 
         await self.token_store.save_refresh_token(
-            email=email, jti=refresh_jti, ttl_seconds=refresh_ttl
+            email=user.email, jti=refresh_jti, ttl_seconds=refresh_ttl
         )
 
         login_response = LoginResponse(

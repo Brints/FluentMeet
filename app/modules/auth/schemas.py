@@ -179,3 +179,9 @@ class RefreshTokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     expires_in: int
+
+
+class GoogleExchangeRequest(BaseModel):
+    """Payload submitted to ``POST /auth/google/exchange``."""
+
+    code: str = Field(..., min_length=1)
