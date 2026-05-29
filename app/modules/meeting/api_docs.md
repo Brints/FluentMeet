@@ -19,10 +19,14 @@
   - [POST /{room_code}/join](#post-room_codejoin)
   - [POST /{room_code}/leave](#post-room_codeleave)
   - [POST /{room_code}/admit/{user_id}](#post-room_codeadmituser_id)
+  - [POST /{room_code}/reject/{user_id}](#post-room_coderejectuser_id)
+  - [POST /{room_code}/admit-all](#post-room_codeadmit-all)
+  - [POST /{room_code}/reject-all](#post-room_codereject-all)
   - [POST /{room_code}/end](#post-room_codeend)
   - [PATCH /{room_code}/config](#patch-room_codeconfig)
   - [POST /{room_code}/invite](#post-room_codeinvite)
 - [WebSocket Endpoints](#websocket-endpoints)
+  - [WS /lobby/{room_code}](#ws-lobbyroom_code)
   - [WS /signaling/{room_code}](#ws-signalingroom_code)
   - [WS /audio/{room_code}](#ws-audioroom_code)
   - [WS /captions/{room_code}](#ws-captionsroom_code)
@@ -363,12 +367,69 @@ Admit a waitlisted participant out of the lobby and into the live room.
 
 **🔒 Requires Authentication:** Host only.
 
-**Response: `200 OK`** Returns the updated live participant list and lobby list in the same format as `GET /{room_code}/participants` to sync the host's view immediately.
+**Response: `200 OK`**
 
 ```json
 {
     "status": "success",
     "message": "User admitted to room."
+}
+```
+
+---
+
+### POST /{room_code}/reject/{user_id}
+
+Reject a waitlisted participant from the lobby.
+
+**🔒 Requires Authentication:** Host only.
+
+**Response: `200 OK`**
+
+```json
+{
+    "status": "success",
+    "message": "User rejected from lobby successfully."
+}
+```
+
+---
+
+### POST /{room_code}/admit-all
+
+Admit all users currently waiting in the lobby into the active room.
+
+**🔒 Requires Authentication:** Host only.
+
+**Response: `200 OK`**
+
+```json
+{
+    "status": "success",
+    "message": "All lobby users admitted successfully.",
+    "data": {
+        "admitted_count": 3
+    }
+}
+```
+
+---
+
+### POST /{room_code}/reject-all
+
+Reject all users currently waiting in the lobby.
+
+**🔒 Requires Authentication:** Host only.
+
+**Response: `200 OK`**
+
+```json
+{
+    "status": "success",
+    "message": "All lobby users rejected successfully.",
+    "data": {
+        "rejected_count": 3
+    }
 }
 ```
 
@@ -477,6 +538,17 @@ Dispatch email invitations utilizing the async Kafka email producer.
 ## WebSocket Endpoints
 
 Clients connect using a `?token=<jwt>` query parameter for authentication instead of HTTP headers. The JWT can be a standard Access Token or a Guest Token returned from `POST /{room_code}/join`.
+
+### WS /lobby/{room_code}
+
+- **Purpose:** WebSocket for users waiting in the lobby. Connected when the POST `/join` call returns `{"status": "waiting"}`.
+- **Authentication:** Connects using `?token=<jwt>` query parameter (Access Token or Guest Token).
+- **Events Pushed from Server:**
+  - `{"type": "admitted", "room_code": "..."}` -> Waitlisted user is admitted to the meeting. The client should close this connection and open connections to the signaling, audio, and captions WebSockets.
+  - `{"type": "rejected", "reason": "Host denied entry"}` -> Waitlisted user entry was denied. The client should close the connection and show a rejection screen.
+  - `{"type": "meeting_ended"}` -> Meeting was ended by the host while the user was waiting in the lobby.
+- **Events Sent by Client:**
+  - `{"type": "cancel"}` -> User cancels their wait and exits the lobby. This removes them from the Redis lobby state and sends a `lobby_cancel` notification to the Host over the signaling WebSocket.
 
 ### WS /signaling/{room_code}
 

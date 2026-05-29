@@ -103,6 +103,8 @@ def mock_cm():
         mock_instance = MagicMock()
         mock_instance.broadcast_to_room = AsyncMock()
         mock_instance.send_to_user = AsyncMock()
+        mock_instance.broadcast_to_lobby = AsyncMock()
+        mock_instance.send_to_lobby_user = AsyncMock()
         mock_get.return_value = mock_instance
         yield mock_instance
 

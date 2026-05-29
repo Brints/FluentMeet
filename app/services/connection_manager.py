@@ -35,6 +35,10 @@ class ConnectionManager:
         self.active_connections: dict[str, dict[str, WebSocket]] = {}
         # Maps room_code -> BackgroundTask (Redis subscriber)
         self._pubsub_tasks: dict[str, asyncio.Task] = {}
+        # Maps room_code -> { user_id -> WebSocket } for lobby waiting rooms
+        self.lobby_connections: dict[str, dict[str, WebSocket]] = {}
+        # Maps room_code -> BackgroundTask (Redis lobby subscriber)
+        self._lobby_pubsub_tasks: dict[str, asyncio.Task] = {}
         self.redis = redis_client
 
     async def connect(self, room_code: str, user_id: str, websocket: WebSocket) -> None:
@@ -188,6 +192,173 @@ class ConnectionManager:
             pass
         finally:
             await pubsub.unsubscribe(channel)
+
+    async def connect_lobby(
+        self, room_code: str, user_id: str, websocket: WebSocket
+    ) -> None:
+        """Register an accepted lobby WebSocket connection in the manager.
+
+        Args:
+            room_code (str): The active room code.
+            user_id (str): The connecting waitlisted participant's user id.
+            websocket (WebSocket): The active websocket connection.
+        """
+        if room_code not in self.lobby_connections:
+            self.lobby_connections[room_code] = {}
+            # Start lobby pub/sub listener for the room
+            self._start_lobby_listening(room_code)
+
+        self.lobby_connections[room_code][user_id] = websocket
+        logger.info(
+            "User %s connected to lobby WS for room %s",
+            log_sanitizer.sanitize(user_id),
+            log_sanitizer.sanitize(room_code),
+        )
+
+    def disconnect_lobby(self, room_code: str, user_id: str) -> None:
+        """Remove a lobby WebSocket connection from the manager.
+
+        Args:
+            room_code (str): The room the user is disconnecting from.
+            user_id (str): The disconnecting waitlisted user id.
+        """
+        if room_code in self.lobby_connections:
+            self.lobby_connections[room_code].pop(user_id, None)
+            logger.info(
+                "User %s disconnected from lobby WS for room %s",
+                log_sanitizer.sanitize(user_id),
+                log_sanitizer.sanitize(room_code),
+            )
+
+            # Clean up empty lobbies
+            if not self.lobby_connections[room_code]:
+                del self.lobby_connections[room_code]
+                self._stop_lobby_listening(room_code)
+
+    async def broadcast_to_lobby(self, room_code: str, message: dict) -> None:
+        """Publish a message to all users in a lobby across all instances.
+
+        Args:
+            room_code (str): The room whose lobby to broadcast to.
+            message (dict): The message payload.
+        """
+        payload = {"type": "broadcast", "data": message}
+        from app.modules.meeting.constants import key_lobby_channel
+
+        await self.redis.publish(key_lobby_channel(room_code), json.dumps(payload))
+
+    async def send_to_lobby_user(
+        self, room_code: str, target_user_id: str, message: dict
+    ) -> None:
+        """Publish a message to a specific user in a lobby across all instances.
+
+        Args:
+            room_code (str): The room containing the target.
+            target_user_id (str): The specific user to receive the message.
+            message (dict): The message payload.
+        """
+        payload = {
+            "type": "unicast",
+            "target_user_id": target_user_id,
+            "data": message,
+        }
+        from app.modules.meeting.constants import key_lobby_channel
+
+        await self.redis.publish(key_lobby_channel(room_code), json.dumps(payload))
+
+    def _start_lobby_listening(self, room_code: str) -> None:
+        """Start a background task to listen for lobby messages on Redis.
+
+        Args:
+            room_code (str): The room code to subscribe to.
+        """
+        if room_code not in self._lobby_pubsub_tasks:
+            task = asyncio.create_task(self._listen_to_lobby_redis(room_code))
+            self._lobby_pubsub_tasks[room_code] = task
+
+    def _stop_lobby_listening(self, room_code: str) -> None:
+        """Cancel the background task listening for lobby messages.
+
+        Args:
+            room_code (str): The room code to unsubscribe from.
+        """
+        task = self._lobby_pubsub_tasks.pop(room_code, None)
+        if task and not task.done():
+            task.cancel()
+
+    async def _listen_to_lobby_redis(self, room_code: str) -> None:
+        """Listen to a lobby Redis channel and dispatch to local websockets.
+
+        Args:
+            room_code (str): The room code being monitored.
+        """
+        pubsub = self.redis.pubsub()
+        from app.modules.meeting.constants import key_lobby_channel
+
+        channel = key_lobby_channel(room_code)
+        await pubsub.subscribe(channel)
+
+        try:
+            async for message in pubsub.listen():
+                if message["type"] != "message":
+                    continue
+
+                payload = json.loads(message["data"])
+                msg_type = payload.get("type")
+                data = payload.get("data")
+
+                # Check if lobby is still active locally
+                if room_code not in self.lobby_connections:
+                    break
+
+                if msg_type == "broadcast":
+                    await self._dispatch_lobby_broadcast(room_code, data)
+                elif msg_type == "unicast":
+                    await self._dispatch_lobby_unicast(room_code, payload, data)
+        except asyncio.CancelledError:
+            pass
+        finally:
+            await pubsub.unsubscribe(channel)
+
+    async def _dispatch_lobby_broadcast(self, room_code: str, data: dict) -> None:
+        """Dispatch a broadcast event to all lobby WebSockets in a room."""
+        for user_id, ws in list(self.lobby_connections[room_code].items()):
+            try:
+                await ws.send_json(data)
+                if data.get("type") in (
+                    "meeting_ended",
+                    "rejected",
+                    "admitted",
+                ):
+                    await ws.close(code=1000)
+            except Exception:
+                logger.warning(
+                    "Failed to send lobby message to %s",
+                    log_sanitizer.sanitize(user_id),
+                )
+
+    async def _dispatch_lobby_unicast(
+        self, room_code: str, payload: dict, data: dict
+    ) -> None:
+        """Dispatch a unicast event to a target lobby WebSocket in a room."""
+        target_id = payload.get("target_user_id")
+        if not isinstance(target_id, str):
+            return
+        target_ws = self.lobby_connections[room_code].get(target_id)
+        if target_ws:
+            try:
+                await target_ws.send_json(data)
+                if data.get("type") in (
+                    "meeting_ended",
+                    "rejected",
+                    "admitted",
+                ):
+                    await target_ws.close(code=1000)
+            except Exception:
+                logger.warning(
+                    "Failed to send lobby unicast message to %s",
+                    log_sanitizer.sanitize(target_id),
+                )
 
 
 # ── Module-level Dependency ───────────────────────────────────────────

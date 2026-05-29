@@ -514,20 +514,59 @@ class MeetingService:
         if not room or room.host_id != host.id:
             raise ForbiddenException(message="Only the host can admit participants.")
 
-        # Fetch display_name BEFORE admit_from_lobby
+        # Fetch display_name and languages BEFORE admit_from_lobby
         # removes the entry from the lobby hash.
         lobby = await self.state.get_lobby(room_code)
-        display_name = lobby.get(target_user_id, {}).get("display_name", "")
+        lobby_data = lobby.get(target_user_id)
+        if not lobby_data:
+            raise BadRequestException(message="User is not in the lobby.")
+
+        display_name = lobby_data.get("display_name", "")
+        listening_language = lobby_data.get("language")
+        speaking_language = lobby_data.get("speaking_language")
 
         was_in_lobby = await self.state.admit_from_lobby(room_code, target_user_id)
 
         if not was_in_lobby:
             raise BadRequestException(message="User is not in the lobby.")
 
+        # Find or create Participant, add to active room, persist to DB
+        try:
+            target_uuid = uuid.UUID(target_user_id)
+        except ValueError:
+            target_uuid = uuid.uuid5(uuid.NAMESPACE_DNS, target_user_id)
+
+        user = self.repo.db.get(User, target_uuid)
+
+        # Check if participant already exists in DB
+        user_uuid = target_uuid if user else None
+        guest_uuid = target_uuid if not user else None
+        ptc = self.repo.get_participant(
+            room.id, user_id=user_uuid, guest_session_id=guest_uuid
+        )
+
+        # Call _finalize_join to persist to DB and write to Redis active participants
+        await self._finalize_join(
+            room,
+            room_code,
+            ptc=ptc,
+            user=user,
+            tracking_id=str(target_uuid),
+            display_name=display_name,
+            listening_language=listening_language,
+            speaking_language=speaking_language,
+            new_guest_token=None,
+            role=ParticipantRole.PARTICIPANT.value
+            if user
+            else ParticipantRole.GUEST.value,
+        )
+
         cm = get_connection_manager()
-        await cm.send_to_user(
+        # Send admission message via lobby connection channel where user is listening
+        await cm.send_to_lobby_user(
             room_code, target_user_id, {"type": "admitted", "room_code": room_code}
         )
+
         # Notify existing participants that the newly admitted user has joined.
         # Without this broadcast, peers already in the room never know the new
         # participant exists and won't initiate WebRTC offers to them.
@@ -537,9 +576,138 @@ class MeetingService:
                 "type": "user_joined",
                 "user_id": target_user_id,
                 "display_name": display_name,
-                "role": "guest",
+                "role": ParticipantRole.PARTICIPANT.value
+                if user
+                else ParticipantRole.GUEST.value,
             },
             sender_id=target_user_id,  # Exclude the admitted user
+        )
+
+    async def admit_all_users(self, host: User, room_code: str) -> int:
+        """Host admits all users currently waiting in the lobby."""
+        room = self.repo.get_room_by_code(room_code)
+        if not room or room.host_id != host.id:
+            raise ForbiddenException(message="Only the host can admit participants.")
+
+        lobby = await self.state.get_lobby(room_code)
+        if not lobby:
+            raise BadRequestException(message="No users in the lobby.")
+
+        cm = get_connection_manager()
+        admitted_count = 0
+
+        for user_id, lobby_data in lobby.items():
+            was_in_lobby = await self.state.admit_from_lobby(room_code, user_id)
+            if not was_in_lobby:
+                continue
+
+            display_name = lobby_data.get("display_name", "")
+            listening_language = lobby_data.get("language")
+            speaking_language = lobby_data.get("speaking_language")
+
+            try:
+                target_uuid = uuid.UUID(user_id)
+            except ValueError:
+                target_uuid = uuid.uuid5(uuid.NAMESPACE_DNS, user_id)
+
+            user = self.repo.db.get(User, target_uuid)
+
+            user_uuid = target_uuid if user else None
+            guest_uuid = target_uuid if not user else None
+            ptc = self.repo.get_participant(
+                room.id, user_id=user_uuid, guest_session_id=guest_uuid
+            )
+
+            await self._finalize_join(
+                room,
+                room_code,
+                ptc=ptc,
+                user=user,
+                tracking_id=str(target_uuid),
+                display_name=display_name,
+                listening_language=listening_language,
+                speaking_language=speaking_language,
+                new_guest_token=None,
+                role=ParticipantRole.PARTICIPANT.value
+                if user
+                else ParticipantRole.GUEST.value,
+            )
+
+            await cm.send_to_lobby_user(
+                room_code, user_id, {"type": "admitted", "room_code": room_code}
+            )
+
+            await cm.broadcast_to_room(
+                room_code,
+                {
+                    "type": "user_joined",
+                    "user_id": user_id,
+                    "display_name": display_name,
+                    "role": ParticipantRole.PARTICIPANT.value
+                    if user
+                    else ParticipantRole.GUEST.value,
+                },
+                sender_id=user_id,
+            )
+            admitted_count += 1
+
+        return admitted_count
+
+    async def reject_user(
+        self, host: User, room_code: str, target_user_id: str
+    ) -> None:
+        """Host rejects a specific user from the lobby."""
+        room = self.repo.get_room_by_code(room_code)
+        if not room or room.host_id != host.id:
+            raise ForbiddenException(message="Only the host can reject participants.")
+
+        lobby = await self.state.get_lobby(room_code)
+        if target_user_id not in lobby:
+            raise BadRequestException(message="User is not in the lobby.")
+
+        await self.state.remove_from_lobby(room_code, target_user_id)
+
+        cm = get_connection_manager()
+        await cm.send_to_lobby_user(
+            room_code,
+            target_user_id,
+            {"type": "rejected", "reason": "Host denied entry"},
+        )
+
+    async def reject_all_users(self, host: User, room_code: str) -> int:
+        """Host rejects all users currently waiting in the lobby."""
+        room = self.repo.get_room_by_code(room_code)
+        if not room or room.host_id != host.id:
+            raise ForbiddenException(message="Only the host can reject participants.")
+
+        lobby = await self.state.get_lobby(room_code)
+        if not lobby:
+            raise BadRequestException(message="No users in the lobby.")
+
+        cm = get_connection_manager()
+        rejected_count = 0
+
+        for user_id in list(lobby.keys()):
+            await self.state.remove_from_lobby(room_code, user_id)
+            await cm.send_to_lobby_user(
+                room_code,
+                user_id,
+                {"type": "rejected", "reason": "Host denied entry"},
+            )
+            rejected_count += 1
+
+        return rejected_count
+
+    async def cancel_lobby_wait(
+        self, room_code: str, user_id: str, _user: User | None = None
+    ) -> None:
+        """User cancels their own wait in the lobby."""
+        await self.state.remove_from_lobby(room_code, user_id)
+
+        cm = get_connection_manager()
+        await cm.broadcast_to_room(
+            room_code,
+            {"type": "lobby_cancel", "user_id": user_id},
         )
 
     async def end_room(self, host: User, room_code: str) -> Room:
@@ -555,6 +723,10 @@ class MeetingService:
         # still has active connections to deliver the message to.
         cm = get_connection_manager()
         await cm.broadcast_to_room(
+            room_code,
+            {"type": "meeting_ended"},
+        )
+        await cm.broadcast_to_lobby(
             room_code,
             {"type": "meeting_ended"},
         )
