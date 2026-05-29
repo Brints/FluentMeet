@@ -556,9 +556,11 @@ class MeetingService:
             listening_language=listening_language,
             speaking_language=speaking_language,
             new_guest_token=None,
-            role=ParticipantRole.PARTICIPANT.value
-            if user
-            else ParticipantRole.GUEST.value,
+            role=(
+                ParticipantRole.PARTICIPANT.value
+                if user
+                else ParticipantRole.GUEST.value
+            ),
         )
 
         cm = get_connection_manager()
@@ -576,9 +578,11 @@ class MeetingService:
                 "type": "user_joined",
                 "user_id": target_user_id,
                 "display_name": display_name,
-                "role": ParticipantRole.PARTICIPANT.value
-                if user
-                else ParticipantRole.GUEST.value,
+                "role": (
+                    ParticipantRole.PARTICIPANT.value
+                    if user
+                    else ParticipantRole.GUEST.value
+                ),
             },
             sender_id=target_user_id,  # Exclude the admitted user
         )
@@ -628,9 +632,11 @@ class MeetingService:
                 listening_language=listening_language,
                 speaking_language=speaking_language,
                 new_guest_token=None,
-                role=ParticipantRole.PARTICIPANT.value
-                if user
-                else ParticipantRole.GUEST.value,
+                role=(
+                    ParticipantRole.PARTICIPANT.value
+                    if user
+                    else ParticipantRole.GUEST.value
+                ),
             )
 
             await cm.send_to_lobby_user(
@@ -643,9 +649,11 @@ class MeetingService:
                     "type": "user_joined",
                     "user_id": user_id,
                     "display_name": display_name,
-                    "role": ParticipantRole.PARTICIPANT.value
-                    if user
-                    else ParticipantRole.GUEST.value,
+                    "role": (
+                        ParticipantRole.PARTICIPANT.value
+                        if user
+                        else ParticipantRole.GUEST.value
+                    ),
                 },
                 sender_id=user_id,
             )
