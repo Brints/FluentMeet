@@ -86,7 +86,7 @@ def test_signup_success_creates_user_and_returns_public_profile(
     assert body["email"] == "user@example.com"
     assert body["full_name"] == "Ada Lovelace"
     assert body["speaking_language"] == "en"
-    assert body["listening_language"] == "fr"
+    assert body["listening_language"] == "en"
     assert body["is_active"] is True
     assert body["is_verified"] is False
     assert "password" not in body

@@ -110,6 +110,9 @@ Retrieve the current authenticated user's profile.
 
 Update the current user's profile properties. The update payload is partial; only supplied fields are modified.
 
+> [!NOTE]
+> To support unified language preference, updating either `speaking_language` or `listening_language` will automatically synchronize both fields to the same language value.
+
 **🔒 Requires Authentication:** `Authorization: Bearer <access_token>`
 
 **Request Body:**
@@ -117,15 +120,15 @@ Update the current user's profile properties. The update payload is partial; onl
 ```json
 {
   "full_name": "Jane H. Doe",
-  "listening_language": "es"
+  "speaking_language": "es"
 }
 ```
 
-| Field                | Type             | Required | Notes                                      |
-|----------------------|------------------|----------|--------------------------------------------|
-| `full_name`          | `string \| null` | ❌        | Max 255 chars                              |
-| `speaking_language`  | `string (enum)`  | ❌        | Values: `en`, `fr`, `de`, `es`, `it`, `pt` |
-| `listening_language` | `string (enum)`  | ❌        | Values: `en`, `fr`, `de`, `es`, `it`, `pt` |
+| Field                | Type             | Required | Notes                                                                      |
+|----------------------|------------------|----------|----------------------------------------------------------------------------|
+| `full_name`          | `string \| null` | ❌        | Max 255 chars                                                              |
+| `speaking_language`  | `string (enum)`  | ❌        | Values: `en`, `fr`, `de`, `es`, `it`, `pt`. Synchronizes both preferences. |
+| `listening_language` | `string (enum)`  | ❌        | Values: `en`, `fr`, `de`, `es`, `it`, `pt`. Synchronizes both preferences. |
 
 **Response: `200 OK`**
 Returns a `ProfileApiResponse` enclosing the updated `UserProfileResponse`.

@@ -185,3 +185,12 @@ class GoogleExchangeRequest(BaseModel):
     """Payload submitted to ``POST /auth/google/exchange``."""
 
     code: str = Field(..., min_length=1)
+
+
+class GoogleExchangeResponse(LoginResponse):
+    """Payload returned on successful Google OAuth exchange.
+
+    Extends LoginResponse with is_new_user field.
+    """
+
+    is_new_user: bool
