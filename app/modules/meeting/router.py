@@ -14,6 +14,8 @@ from app.core.config import settings
 from app.core.dependencies import get_current_user, get_current_user_optional
 from app.modules.auth.models import User
 from app.modules.meeting.constants import (
+    MSG_ALL_USERS_ADMITTED,
+    MSG_ALL_USERS_REJECTED,
     MSG_INVITATIONS_SENT,
     MSG_MEETING_ENDED,
     MSG_MEETING_HISTORY,
@@ -23,6 +25,7 @@ from app.modules.meeting.constants import (
     MSG_ROOM_JOINED,
     MSG_ROOM_LEFT,
     MSG_USER_ADMITTED,
+    MSG_USER_REJECTED,
 )
 from app.modules.meeting.dependencies import get_meeting_service
 from app.modules.meeting.schemas import (
@@ -212,6 +215,68 @@ async def admit_user(
     )
     return JSONResponse(
         content={"status": "success", "message": MSG_USER_ADMITTED},
+        status_code=status.HTTP_200_OK,
+    )
+
+
+@router.post(
+    "/{room_code}/reject/{user_id}",
+    status_code=status.HTTP_200_OK,
+    summary="Host proxy: rejects a user from the waiting room lobby",
+)
+async def reject_user(
+    room_code: str,
+    user_id: str,
+    current_user: User = Depends(get_current_user),
+    service: MeetingService = Depends(get_meeting_service),
+) -> JSONResponse:
+    await service.reject_user(
+        host=current_user, room_code=room_code, target_user_id=user_id
+    )
+    return JSONResponse(
+        content={"status": "success", "message": MSG_USER_REJECTED},
+        status_code=status.HTTP_200_OK,
+    )
+
+
+@router.post(
+    "/{room_code}/admit-all",
+    status_code=status.HTTP_200_OK,
+    summary="Host proxy: admits all users from the waiting room lobby",
+)
+async def admit_all_users(
+    room_code: str,
+    current_user: User = Depends(get_current_user),
+    service: MeetingService = Depends(get_meeting_service),
+) -> JSONResponse:
+    count = await service.admit_all_users(host=current_user, room_code=room_code)
+    return JSONResponse(
+        content={
+            "status": "success",
+            "message": MSG_ALL_USERS_ADMITTED,
+            "data": {"admitted_count": count},
+        },
+        status_code=status.HTTP_200_OK,
+    )
+
+
+@router.post(
+    "/{room_code}/reject-all",
+    status_code=status.HTTP_200_OK,
+    summary="Host proxy: rejects all users from the waiting room lobby",
+)
+async def reject_all_users(
+    room_code: str,
+    current_user: User = Depends(get_current_user),
+    service: MeetingService = Depends(get_meeting_service),
+) -> JSONResponse:
+    count = await service.reject_all_users(host=current_user, room_code=room_code)
+    return JSONResponse(
+        content={
+            "status": "success",
+            "message": MSG_ALL_USERS_REJECTED,
+            "data": {"rejected_count": count},
+        },
         status_code=status.HTTP_200_OK,
     )
 

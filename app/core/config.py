@@ -30,10 +30,6 @@ class Settings(BaseSettings):
     VERSION: str = get_version()
     API_V1_STR: str = "/api/v1"
 
-    # Default Admin
-    ADMIN_EMAIL: str | None = None
-    ADMIN_PASSWORD: str | None = None
-
     # Security
     SECRET_KEY: str = "placeholder_secret_key"
     ALGORITHM: str = "HS256"

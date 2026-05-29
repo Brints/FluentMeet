@@ -40,6 +40,9 @@ MSG_ROOM_DETAILS = "Room details retrieved successfully."
 MSG_ROOM_JOINED = "Joined room successfully."
 MSG_ROOM_LEFT = "Left room successfully."
 MSG_USER_ADMITTED = "User admitted to room."
+MSG_USER_REJECTED = "User rejected from lobby successfully."
+MSG_ALL_USERS_ADMITTED = "All lobby users admitted successfully."
+MSG_ALL_USERS_REJECTED = "All lobby users rejected successfully."
 MSG_MEETING_ENDED = "Meeting ended successfully."
 MSG_ROOM_CONFIG_UPDATED = "Room configuration updated."
 MSG_MEETING_HISTORY = "Meeting history retrieved successfully."
@@ -91,3 +94,7 @@ def key_room_lobby(room_code: str) -> str:
 
 def key_room_active_speaker(room_code: str) -> str:
     return f"room:{room_code}:active_speaker"
+
+
+def key_lobby_channel(room_code: str) -> str:
+    return f"ws:lobby:{room_code}"

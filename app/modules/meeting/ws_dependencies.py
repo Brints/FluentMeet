@@ -97,3 +97,28 @@ async def assert_room_participant(room_code: str, user_id: str) -> dict:
             reason="User is not a participant of this room",
         )
     return participant_state
+
+
+async def assert_lobby_participant(room_code: str, user_id: str) -> dict:
+    """Ensure the user is in the lobby hash (not participants hash).
+
+    This is the inverse of assert_room_participant — used exclusively
+    for the lobby WebSocket endpoint.
+
+    Args:
+        room_code (str): Active room code.
+        user_id (str): Waitlisted user ID.
+
+    Returns:
+        dict: The waitlisted lobby state dictionary.
+    """
+    state_service = MeetingStateService()
+    lobby = await state_service.get_lobby(room_code)
+
+    lobby_state = lobby.get(user_id)
+    if not lobby_state:
+        raise WebSocketException(
+            code=status.WS_1008_POLICY_VIOLATION,
+            reason="User is not in the lobby",
+        )
+    return lobby_state

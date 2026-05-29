@@ -13,7 +13,11 @@ from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 
 from app.core.sanitize import log_sanitizer, sanitize_for_log
 from app.modules.meeting.state import MeetingStateService
-from app.modules.meeting.ws_dependencies import assert_room_participant, authenticate_ws
+from app.modules.meeting.ws_dependencies import (
+    assert_lobby_participant,
+    assert_room_participant,
+    authenticate_ws,
+)
 from app.schemas.pipeline import (
     SynthesizedAudioEvent,
 )
@@ -334,3 +338,54 @@ async def captions_websocket(
         pass
     finally:
         await pubsub.unsubscribe(channel)
+
+
+@router.websocket("/lobby/{room_code}")
+async def lobby_websocket(
+    websocket: WebSocket,
+    room_code: str,
+    user_id: str = Depends(authenticate_ws),
+) -> None:
+    """WebSocket for users waiting in the lobby.
+
+    Lobby users connect here after POST /join returns {"status": "waiting"}.
+    They receive real-time server-pushed events:
+    - {"type": "admitted"} -> user should close this WS and connect to signaling
+    - {"type": "rejected"} -> user should close this WS and show rejection UI
+    - {"type": "meeting_ended"} -> meeting was ended while user was waiting
+
+    They can also SEND client messages:
+    - {"type": "cancel"} -> user cancels their wait (removes from lobby)
+    """
+    try:
+        _ = await assert_lobby_participant(room_code, user_id)
+    except Exception as e:
+        await websocket.close(code=1008, reason=str(e))
+        return
+
+    await websocket.accept()
+
+    manager = get_connection_manager()
+    await manager.connect_lobby(room_code, user_id, websocket)
+
+    try:
+        while True:
+            data = await websocket.receive_text()
+            try:
+                payload = json.loads(data)
+                msg_type = payload.get("type")
+                if msg_type == "cancel":
+                    from app.modules.meeting.service import MeetingService
+                    from app.modules.meeting.state import MeetingStateService
+
+                    state = MeetingStateService()
+                    service = MeetingService(repo=None, state=state)  # type: ignore[arg-type]
+                    await service.cancel_lobby_wait(room_code, user_id)
+                    await websocket.close(code=1000, reason="Canceled wait")
+                    break
+            except json.JSONDecodeError:
+                logger.warning("Invalid JSON received on lobby WS")
+    except WebSocketDisconnect:
+        pass
+    finally:
+        manager.disconnect_lobby(room_code, user_id)
