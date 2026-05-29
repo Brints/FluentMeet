@@ -51,7 +51,7 @@ def test_google_callback_invalid_state(
     mock_exchange_code: AsyncMock,  # noqa: ARG001
 ) -> None:
     mock_redis_instance = AsyncMock()
-    mock_redis_instance.exists.return_value = False
+    mock_redis_instance.get.return_value = None
     mock_redis.return_value = mock_redis_instance
 
     response = client.get(
@@ -70,7 +70,7 @@ def test_google_callback_unverified_email(
     mock_exchange_code: AsyncMock,
 ) -> None:
     mock_redis_instance = AsyncMock()
-    mock_redis_instance.exists.return_value = True
+    mock_redis_instance.get.return_value = b"login"
     mock_redis.return_value = mock_redis_instance
 
     mock_exchange_code.return_value = "mock_token"
@@ -100,7 +100,7 @@ def test_google_callback_and_exchange_success(
     mock_exchange_code: AsyncMock,
 ) -> None:
     mock_redis_instance = AsyncMock()
-    mock_redis_instance.exists.return_value = True
+    mock_redis_instance.get.return_value = b"login"
     mock_redis.return_value = mock_redis_instance
 
     mock_exchange_code.return_value = "mock_token"
@@ -122,6 +122,7 @@ def test_google_callback_and_exchange_success(
         ),
         "test_refresh_jwt",
         86400,
+        False,
     )
 
     app.dependency_overrides[get_auth_service] = lambda: mock_auth_svc
@@ -158,6 +159,7 @@ def test_google_callback_and_exchange_success(
                     "expires_in": 3600,
                     "refresh_token": "test_refresh_jwt",
                     "refresh_ttl": 86400,
+                    "is_new_user": False,
                 }
             )
         ),
@@ -173,6 +175,7 @@ def test_google_callback_and_exchange_success(
             "expires_in": 3600,
             "refresh_token": "test_refresh_jwt",
             "refresh_ttl": 86400,
+            "is_new_user": False,
         }
     )
 
@@ -187,6 +190,7 @@ def test_google_callback_and_exchange_success(
     assert exchange_response.status_code == 200
     assert exchange_response.json()["access_token"] == "test_access_jwt"
     assert exchange_response.json()["token_type"] == "bearer"
+    assert exchange_response.json()["is_new_user"] is False
     assert "refresh_token" in exchange_response.cookies
     assert exchange_response.cookies["refresh_token"] == "test_refresh_jwt"
 
@@ -194,3 +198,126 @@ def test_google_callback_and_exchange_success(
     mock_redis_instance.getdel.assert_called_once_with(
         f"oauth_exchange:{exchange_code}"
     )
+
+
+@patch("app.modules.auth.oauth_google.GoogleOAuthService.exchange_code")
+@patch("app.modules.auth.oauth_google.GoogleOAuthService.get_user_info")
+@patch("app.modules.auth.token_store._get_redis_client")
+def test_google_callback_signup_conflict(
+    mock_redis,
+    mock_get_user_info: AsyncMock,
+    mock_exchange_code: AsyncMock,
+) -> None:
+    mock_redis_instance = AsyncMock()
+    mock_redis_instance.get.return_value = b"signup"
+    mock_redis.return_value = mock_redis_instance
+
+    mock_exchange_code.return_value = "mock_token"
+    mock_get_user_info.return_value = {
+        "email": "existing@google.com",
+        "email_verified": True,
+        "sub": "google123",
+        "name": "Google User",
+        "picture": "http://example.com/avatar.png",
+    }
+
+    from app.core.exceptions import ConflictException
+
+    mock_auth_svc = AsyncMock()
+    mock_auth_svc.resolve_oauth_user.side_effect = ConflictException(
+        code="EMAIL_ALREADY_REGISTERED",
+        message="An account with this email already exists.",
+    )
+    app.dependency_overrides[get_auth_service] = lambda: mock_auth_svc
+
+    response = client.get(
+        "/api/v1/auth/google/callback?code=mockcode&state=validstate",
+        follow_redirects=False,
+    )
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 409
+    assert response.json()["code"] == "EMAIL_ALREADY_REGISTERED"
+
+
+@patch("app.modules.auth.oauth_google.GoogleOAuthService.exchange_code")
+@patch("app.modules.auth.oauth_google.GoogleOAuthService.get_user_info")
+@patch("app.modules.auth.token_store._get_redis_client")
+def test_google_callback_login_nonexistent(
+    mock_redis,
+    mock_get_user_info: AsyncMock,
+    mock_exchange_code: AsyncMock,
+) -> None:
+    mock_redis_instance = AsyncMock()
+    mock_redis_instance.get.return_value = b"login"
+    mock_redis.return_value = mock_redis_instance
+
+    mock_exchange_code.return_value = "mock_token"
+    mock_get_user_info.return_value = {
+        "email": "new@google.com",
+        "email_verified": True,
+        "sub": "google123",
+        "name": "Google User",
+        "picture": "http://example.com/avatar.png",
+    }
+
+    from app.core.exceptions import NotFoundException
+
+    mock_auth_svc = AsyncMock()
+    mock_auth_svc.resolve_oauth_user.side_effect = NotFoundException(
+        code="ACCOUNT_NOT_FOUND",
+        message="No account found with this email. Please sign up first.",
+    )
+    app.dependency_overrides[get_auth_service] = lambda: mock_auth_svc
+
+    response = client.get(
+        "/api/v1/auth/google/callback?code=mockcode&state=validstate",
+        follow_redirects=False,
+    )
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 404
+    assert response.json()["code"] == "ACCOUNT_NOT_FOUND"
+
+
+@patch("app.modules.auth.oauth_google.GoogleOAuthService.exchange_code")
+@patch("app.modules.auth.oauth_google.GoogleOAuthService.get_user_info")
+@patch("app.modules.auth.token_store._get_redis_client")
+def test_google_callback_login_method_mismatch(
+    mock_redis,
+    mock_get_user_info: AsyncMock,
+    mock_exchange_code: AsyncMock,
+) -> None:
+    mock_redis_instance = AsyncMock()
+    mock_redis_instance.get.return_value = b"login"
+    mock_redis.return_value = mock_redis_instance
+
+    mock_exchange_code.return_value = "mock_token"
+    mock_get_user_info.return_value = {
+        "email": "emailpassword@google.com",
+        "email_verified": True,
+        "sub": "google123",
+        "name": "Google User",
+        "picture": "http://example.com/avatar.png",
+    }
+
+    from app.core.exceptions import BadRequestException
+
+    mock_auth_svc = AsyncMock()
+    mock_auth_svc.resolve_oauth_user.side_effect = BadRequestException(
+        code="AUTH_METHOD_MISMATCH",
+        message=(
+            "This account was created with email and password. "
+            "Please log in with your password."
+        ),
+    )
+    app.dependency_overrides[get_auth_service] = lambda: mock_auth_svc
+
+    response = client.get(
+        "/api/v1/auth/google/callback?code=mockcode&state=validstate",
+        follow_redirects=False,
+    )
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 400
+    assert response.json()["code"] == "AUTH_METHOD_MISMATCH"

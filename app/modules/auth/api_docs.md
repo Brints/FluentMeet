@@ -666,11 +666,17 @@ Set-Cookie: refresh_token=<new_rt>; HttpOnly; Secure; SameSite=Strict; Path=/api
 
 Initiate the Google OAuth 2.0 authorization flow by redirecting the user to Google's consent screen.
 
+**Query Parameters:**
+
+| Parameter | Type     | Required | Description                                                                 |
+|-----------|----------|----------|-----------------------------------------------------------------------------|
+| `flow`    | `string` | ❌        | The authorization flow, either `"login"` or `"signup"`. Default: `"login"`. |
+
 **Response: `302 Found`**
 
 Redirects to Google's OAuth consent URL with:
 - `client_id`, `redirect_uri`, `scope: "openid email profile"`
-- A cryptographically random `state` parameter stored in Redis for 10 minutes.
+- A cryptographically random `state` parameter stored in Redis for 10 minutes, which maps to the chosen `flow` value.
 
 ---
 
@@ -697,19 +703,24 @@ During the redirect callback, if an error occurs, it is returned as a JSON error
 |--------|----------------------------|----------------------------------------------------------|
 | `400`  | `INVALID_OAUTH_STATE`      | State token is invalid or expired                        |
 | `400`  | `INVALID_OAUTH_PROFILE`    | Google account does not provide a verified email address |
+| `400`  | `AUTH_METHOD_MISMATCH`     | Account was created with email/password (login flow)     |
 | `403`  | `ACCOUNT_LOCKED`           | Account is locked due to failed attempts                 |
 | `403`  | `ACCOUNT_DEACTIVATED`      | Account is deactivated or deleted                        |
+| `404`  | `ACCOUNT_NOT_FOUND`        | No account found for this email (login flow)             |
+| `409`  | `EMAIL_ALREADY_REGISTERED` | Account already exists (signup flow)                     |
 | `409`  | `GOOGLE_ID_ALREADY_LINKED` | Google account is already linked to another user account |
 | `502`  | `OAUTH_PROVIDER_ERROR`     | Failed to communicate with Google                        |
 
 **User Resolution Logic:**
-1. If a user with the `google_id` exists:
-   - If a user with the email exists and has a different user ID, raises `GOOGLE_ID_ALREADY_LINKED` (409 Conflict).
-   - Otherwise, resolve user.
-2. If a user with the email exists but `google_id` is empty:
-   - Links the Google ID, updates avatar if missing, and marks email verified.
-3. If no user exists:
-   - Creates a new verified user with a random hashed password, sets `google_id`, `full_name`, and `avatar_url`.
+
+Based on the `flow` query parameter saved during initiation:
+- **`signup` flow:**
+  - If a user with the email or Google ID already exists, raises `EMAIL_ALREADY_REGISTERED` (409 Conflict).
+  - Otherwise, creates a new verified user with a random hashed password, sets `google_id`, `full_name`, and `avatar_url`, and returns `is_new_user = true`.
+- **`login` flow:**
+  - If the user does not exist, raises `ACCOUNT_NOT_FOUND` (404 Not Found).
+  - If the user exists but `google_id` is empty (email/password user), raises `AUTH_METHOD_MISMATCH` (400 Bad Request).
+  - Otherwise, links the Google ID if missing, updates avatar, and returns `is_new_user = false`.
 
 ---
 
@@ -736,7 +747,8 @@ Exchange the short-lived single-use exchange code received from the callback red
   "access_token": "eyJhbGciOiJIUzI1NiIs...",
   "user_id": "550e8400-e29b-41d4-a716-446655440000",
   "token_type": "bearer",
-  "expires_in": 3600
+  "expires_in": 3600,
+  "is_new_user": false
 }
 ```
 
@@ -833,13 +845,14 @@ Set-Cookie: refresh_token=<rt>; HttpOnly; Secure; SameSite=Strict; Path=/api/v1/
 
 ### Response Schemas
 
-| Schema                  | Used By               | Fields                                                                                                                       |
-|-------------------------|-----------------------|------------------------------------------------------------------------------------------------------------------------------|
-| `SignupResponse`        | `POST /signup`        | `id`, `email`, `full_name`, `speaking_language`, `listening_language`, `user_role`, `is_active`, `is_verified`, `created_at` |
-| `LoginResponse`         | `POST /login`         | `access_token`, `user_id`, `token_type`, `expires_in`                                                                        |
-| `VerifyEmailResponse`   | `GET /verify-email`   | `status` (= `"ok"`), `message`                                                                                               |
-| `ActionAcknowledgement` | Multiple endpoints    | `status` (= `"ok"`), `message`                                                                                               |
-| `RefreshTokenResponse`  | `POST /refresh-token` | `access_token`, `token_type`, `expires_in`                                                                                   |
+| Schema                   | Used By                 | Fields                                                                                                                       |
+|--------------------------|-------------------------|------------------------------------------------------------------------------------------------------------------------------|
+| `SignupResponse`         | `POST /signup`          | `id`, `email`, `full_name`, `speaking_language`, `listening_language`, `user_role`, `is_active`, `is_verified`, `created_at` |
+| `LoginResponse`          | `POST /login`           | `access_token`, `user_id`, `token_type`, `expires_in`                                                                        |
+| `GoogleExchangeResponse` | `POST /google/exchange` | `access_token`, `user_id`, `token_type`, `expires_in`, `is_new_user`                                                         |
+| `VerifyEmailResponse`    | `GET /verify-email`     | `status` (= `"ok"`), `message`                                                                                               |
+| `ActionAcknowledgement`  | Multiple endpoints      | `status` (= `"ok"`), `message`                                                                                               |
+| `RefreshTokenResponse`   | `POST /refresh-token`   | `access_token`, `token_type`, `expires_in`                                                                                   |
 
 ---
 
@@ -856,30 +869,32 @@ All errors follow a consistent JSON structure:
 
 ### Complete Error Code Table
 
-| Code                       | HTTP Status | Endpoint(s)                                      | Description                                      |
-|----------------------------|-------------|--------------------------------------------------|--------------------------------------------------|
-| `EMAIL_ALREADY_REGISTERED` | 409         | `/signup`                                        | Duplicate email at registration                  |
-| `MISSING_CREDENTIALS`      | 400         | `/login`                                         | Empty request body on login                      |
-| `INVALID_CREDENTIALS`      | 401         | `/login`, auth guard                             | Wrong email/password or invalid JWT              |
-| `EMAIL_NOT_VERIFIED`       | 403         | `/login`                                         | Attempting login before email verification       |
-| `ACCOUNT_DELETED`          | 403         | `/login`, auth guard                             | Account has been soft-deleted                    |
-| `ACCOUNT_LOCKED`           | 403         | `/login`, `/google/callback`                     | Locked after too many failed attempts            |
-| `ACCOUNT_DEACTIVATED`      | 403         | `/refresh-token`, `/google/callback`, auth guard | Account deactivated or deleted                   |
-| `MISSING_TOKEN`            | 400/401     | `/verify-email`, auth guard                      | Token not provided                               |
-| `INVALID_TOKEN`            | 400         | `/verify-email`                                  | Token is malformed or not found                  |
-| `TOKEN_EXPIRED`            | 400         | `/verify-email`                                  | Verification token has expired                   |
-| `TOKEN_REVOKED`            | 401         | Auth guard                                       | Access token has been blacklisted                |
-| `INVALID_RESET_TOKEN`      | 400         | `/reset-password`                                | Reset token not found or user missing            |
-| `RESET_TOKEN_EXPIRED`      | 400         | `/reset-password`                                | Password reset token has expired                 |
-| `SAME_PASSWORD`            | 400         | `/reset-password`, `/change-password`            | New password matches the current one             |
-| `INCORRECT_PASSWORD`       | 400         | `/change-password`                               | Current password verification failed             |
-| `MISSING_REFRESH_TOKEN`    | 401         | `/refresh-token`                                 | No refresh token cookie present                  |
-| `INVALID_REFRESH_TOKEN`    | 401         | `/refresh-token`                                 | Refresh token JWT is invalid or expired          |
-| `REFRESH_TOKEN_REUSE`      | 401         | `/refresh-token`                                 | Revoked token was replayed — all sessions killed |
-| `INVALID_OAUTH_STATE`      | 400         | `/google/callback`                               | CSRF state token invalid or expired              |
-| `INVALID_OAUTH_PROFILE`    | 400         | `/google/callback`                               | Google profile missing email address             |
-| `OAUTH_PROVIDER_ERROR`     | 502         | `/google/callback`                               | Failed to communicate with Google APIs           |
-| `INVALID_EXCHANGE_CODE`    | 400         | `/google/exchange`                               | The exchange code is invalid, reused, or expired |
+| Code                       | HTTP Status | Endpoint(s)                                      | Description                                              |
+|----------------------------|-------------|--------------------------------------------------|----------------------------------------------------------|
+| `EMAIL_ALREADY_REGISTERED` | 409         | `/signup`                                        | Duplicate email at registration                          |
+| `MISSING_CREDENTIALS`      | 400         | `/login`                                         | Empty request body on login                              |
+| `INVALID_CREDENTIALS`      | 401         | `/login`, auth guard                             | Wrong email/password or invalid JWT                      |
+| `EMAIL_NOT_VERIFIED`       | 403         | `/login`                                         | Attempting login before email verification               |
+| `ACCOUNT_DELETED`          | 403         | `/login`, auth guard                             | Account has been soft-deleted                            |
+| `ACCOUNT_LOCKED`           | 403         | `/login`, `/google/callback`                     | Locked after too many failed attempts                    |
+| `ACCOUNT_DEACTIVATED`      | 403         | `/refresh-token`, `/google/callback`, auth guard | Account deactivated or deleted                           |
+| `MISSING_TOKEN`            | 400/401     | `/verify-email`, auth guard                      | Token not provided                                       |
+| `INVALID_TOKEN`            | 400         | `/verify-email`                                  | Token is malformed or not found                          |
+| `TOKEN_EXPIRED`            | 400         | `/verify-email`                                  | Verification token has expired                           |
+| `TOKEN_REVOKED`            | 401         | Auth guard                                       | Access token has been blacklisted                        |
+| `INVALID_RESET_TOKEN`      | 400         | `/reset-password`                                | Reset token not found or user missing                    |
+| `RESET_TOKEN_EXPIRED`      | 400         | `/reset-password`                                | Password reset token has expired                         |
+| `SAME_PASSWORD`            | 400         | `/reset-password`, `/change-password`            | New password matches the current one                     |
+| `INCORRECT_PASSWORD`       | 400         | `/change-password`                               | Current password verification failed                     |
+| `MISSING_REFRESH_TOKEN`    | 401         | `/refresh-token`                                 | No refresh token cookie present                          |
+| `INVALID_REFRESH_TOKEN`    | 401         | `/refresh-token`                                 | Refresh token JWT is invalid or expired                  |
+| `REFRESH_TOKEN_REUSE`      | 401         | `/refresh-token`                                 | Revoked token was replayed — all sessions killed         |
+| `INVALID_OAUTH_STATE`      | 400         | `/google/callback`                               | CSRF state token invalid or expired                      |
+| `INVALID_OAUTH_PROFILE`    | 400         | `/google/callback`                               | Google profile missing email address                     |
+| `AUTH_METHOD_MISMATCH`     | 400         | `/google/callback`                               | Account was created with email/password                  |
+| `ACCOUNT_NOT_FOUND`        | 404         | `/google/callback`                               | No account found for this email (login flow)             |
+| `OAUTH_PROVIDER_ERROR`     | 502         | `/google/callback`                               | Failed to communicate with Google APIs                   |
+| `INVALID_EXCHANGE_CODE`    | 400         | `/google/exchange`                               | The exchange code is invalid, reused, or expired         |
 | `GOOGLE_ID_ALREADY_LINKED` | 409         | `/google/callback`                               | Google account is already linked to another user account |
 
 ---

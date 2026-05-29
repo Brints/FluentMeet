@@ -27,6 +27,7 @@ from app.modules.auth.schemas import (
     ChangePasswordRequest,
     ForgotPasswordRequest,
     GoogleExchangeRequest,
+    GoogleExchangeResponse,
     LoginRequest,
     LoginResponse,
     RefreshTokenResponse,
@@ -390,17 +391,28 @@ async def refresh_token(
 @limiter.limit("10/minute")
 async def google_login(
     request: Request,
+    flow: str = Query(
+        default="login",
+        description="The target flow (either 'login' or 'signup')",
+    ),
     google_oauth: GoogleOAuthService = Depends(get_google_oauth_service),
 ) -> RedirectResponse:
     import secrets
 
+    from app.core.exceptions import BadRequestException
     from app.modules.auth.token_store import _get_redis_client
 
     del request  # consumed by slowapi
 
+    if flow not in ("login", "signup"):
+        raise BadRequestException(
+            code="INVALID_FLOW",
+            message="Flow parameter must be either 'login' or 'signup'.",
+        )
+
     state = secrets.token_urlsafe(32)
     redis = _get_redis_client()
-    await redis.set(f"oauth_state:{state}", "1", ex=600)  # 10 minutes TTL
+    await redis.set(f"oauth_state:{state}", flow, ex=600)  # 10 minutes TTL
 
     url = google_oauth.build_auth_url(state=state)
     return RedirectResponse(url=url, status_code=302)
@@ -429,12 +441,14 @@ async def google_callback(
     redis = _get_redis_client()
     state_key = f"oauth_state:{state}"
 
-    # 1. State Validation
-    if not await redis.exists(state_key):
+    # 1. State Validation & Flow retrieval
+    flow_bytes = await redis.get(state_key)
+    if not flow_bytes:
         raise BadRequestException(
             code="INVALID_OAUTH_STATE",
             message="OAuth state is invalid or has expired.",
         )
+    flow = flow_bytes.decode() if isinstance(flow_bytes, bytes) else flow_bytes
 
     await redis.delete(state_key)
 
@@ -455,11 +469,17 @@ async def google_callback(
     avatar = user_info.get("picture")
 
     # 3. Resolve user
-    login_response, refresh_token, refresh_ttl = await auth_service.resolve_oauth_user(
+    (
+        login_response,
+        refresh_token,
+        refresh_ttl,
+        is_new_user,
+    ) = await auth_service.resolve_oauth_user(
         email=cast(str, email),
         google_id=google_id,
         name=name,
         avatar_url=avatar,
+        flow=flow,
     )
 
     # 4. Generate temporary exchange code and store tokens securely in Redis
@@ -471,6 +491,7 @@ async def google_callback(
         "expires_in": login_response.expires_in,
         "refresh_token": refresh_token,
         "refresh_ttl": refresh_ttl,
+        "is_new_user": is_new_user,
     }
     await redis.set(
         f"oauth_exchange:{exchange_code}",
@@ -485,7 +506,7 @@ async def google_callback(
 
 @router.post(
     "/google/exchange",
-    response_model=LoginResponse,
+    response_model=GoogleExchangeResponse,
     summary="Exchange temporary OAuth code for access token",
     description=(
         "Exchanges a short-lived authorization code retrieved from Google Callback "
@@ -517,11 +538,12 @@ async def google_exchange(
 
     data = json.loads(data_str)
 
-    login_response = LoginResponse(
+    login_response = GoogleExchangeResponse(
         access_token=data["access_token"],
         user_id=data["user_id"],
         token_type=data["token_type"],
         expires_in=data["expires_in"],
+        is_new_user=data.get("is_new_user", False),
     )
 
     res = JSONResponse(

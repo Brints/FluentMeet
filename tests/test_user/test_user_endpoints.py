@@ -203,14 +203,25 @@ class TestUpdateProfile:
         assert data["full_name"] == "Ada K. Lovelace"
 
     def test_update_languages(self, client: TestClient) -> None:
+        # If user updates speaking_language, both are updated to de
         response = client.patch(
             "/api/v1/users/me",
-            json={"speaking_language": "de", "listening_language": "es"},
+            json={"speaking_language": "de"},
         )
         assert response.status_code == 200
         data = response.json()["data"]
         assert data["speaking_language"] == "de"
-        assert data["listening_language"] == "es"
+        assert data["listening_language"] == "de"
+
+        # If user updates listening_language, both are updated to es
+        response2 = client.patch(
+            "/api/v1/users/me",
+            json={"listening_language": "es"},
+        )
+        assert response2.status_code == 200
+        data2 = response2.json()["data"]
+        assert data2["speaking_language"] == "es"
+        assert data2["listening_language"] == "es"
 
     def test_empty_body_no_change(self, client: TestClient) -> None:
         response = client.patch("/api/v1/users/me", json={})

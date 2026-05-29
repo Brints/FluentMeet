@@ -76,6 +76,24 @@ async def update_profile(
     update_data = payload.model_dump(exclude_unset=True)
 
     if update_data:
+        # Enforce that if speaking_language or listening_language is updated,
+        # both fields are synchronized to the same language value.
+        new_lang = None
+        if (
+            "speaking_language" in update_data
+            and update_data["speaking_language"] is not None
+        ):
+            new_lang = update_data["speaking_language"]
+        elif (
+            "listening_language" in update_data
+            and update_data["listening_language"] is not None
+        ):
+            new_lang = update_data["listening_language"]
+
+        if new_lang is not None:
+            update_data["speaking_language"] = new_lang
+            update_data["listening_language"] = new_lang
+
         # Convert SupportedLanguage enum values to plain strings for ORM.
         for lang_field in ("speaking_language", "listening_language"):
             if lang_field in update_data and update_data[lang_field] is not None:

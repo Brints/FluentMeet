@@ -16,6 +16,7 @@ from app.core.exceptions import (
     BadRequestException,
     ConflictException,
     ForbiddenException,
+    NotFoundException,
     UnauthorizedException,
 )
 from app.core.sanitize import sanitize_log_args
@@ -89,7 +90,7 @@ class AuthService:
             hashed_password=self.security_service.hash_password(user_in.password),
             full_name=user_in.full_name,
             speaking_language=user_in.speaking_language.value,
-            listening_language=user_in.listening_language.value,
+            listening_language=user_in.speaking_language.value,
             is_active=True,
             is_verified=False,
         )
@@ -433,8 +434,13 @@ class AuthService:
         return user
 
     async def resolve_oauth_user(
-        self, email: str, google_id: str, name: str | None, avatar_url: str | None
-    ) -> tuple[LoginResponse, str, int]:
+        self,
+        email: str,
+        google_id: str,
+        name: str | None,
+        avatar_url: str | None,
+        flow: str,
+    ) -> tuple[LoginResponse, str, int, bool]:
         """Handle OAuth user resolution.
 
         Args:
@@ -442,19 +448,40 @@ class AuthService:
             google_id (str): The Google ID.
             name (str | None): The user's name.
             avatar_url (str | None): The user's avatar URL.
+            flow (str): The authorization flow, either "login" or "signup".
 
         Returns:
-            tuple[LoginResponse, str, int]: The new access token, refresh token,
-                and TTL in seconds.
+            tuple[LoginResponse, str, int, bool]: The new access token, refresh token,
+                TTL in seconds, and is_new_user boolean.
         """
         email = email.lower()
         user = self._find_oauth_user(email, google_id)
 
-        if user:
+        if flow == "signup":
+            if user:
+                raise ConflictException(
+                    code="EMAIL_ALREADY_REGISTERED",
+                    message="An account with this email already exists.",
+                )
+            user = self._create_oauth_user(email, google_id, name, avatar_url)
+            is_new_user = True
+        else:  # login flow
+            if not user:
+                raise NotFoundException(
+                    code="ACCOUNT_NOT_FOUND",
+                    message="No account found with this email. Please sign up first.",
+                )
+            if not user.google_id:
+                raise BadRequestException(
+                    code="AUTH_METHOD_MISMATCH",
+                    message=(
+                        "This account was created with email and password. "
+                        "Please log in with your password."
+                    ),
+                )
             await self._check_oauth_user_status(user)
             self._update_oauth_user_profile(user, google_id, avatar_url)
-        else:
-            user = self._create_oauth_user(email, google_id, name, avatar_url)
+            is_new_user = False
 
         # Issue tokens for successful OAuth login (use user.email, not the
         # Google-provided email, in case user_by_google has a different stored email)
@@ -476,7 +503,7 @@ class AuthService:
             expires_in=expires_in,
         )
 
-        return login_response, refresh_token, refresh_ttl
+        return login_response, refresh_token, refresh_ttl, is_new_user
 
     # ------------------------------------------------------------------
     # Logout
