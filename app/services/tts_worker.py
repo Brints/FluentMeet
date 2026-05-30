@@ -16,6 +16,7 @@ from typing import Any
 
 from app.core.config import settings
 from app.external_services.deepgram_tts.service import get_deepgram_tts_service
+from app.external_services.elevenlabs_tts.service import get_elevenlabs_tts_service
 from app.external_services.openai_tts.service import get_openai_tts_service
 from app.external_services.voiceai.service import get_voiceai_tts_service
 from app.external_services.voiceai.websocket_streaming import get_voiceai_ws_tts_service
@@ -115,6 +116,12 @@ class TTSWorker(BaseConsumer):
         pipeline_start: float,
     ) -> None:
         """Route synthesis to the specified provider."""
+        if provider == "elevenlabs" and settings.ELEVENLABS_TTS_USE_STREAMING:
+            await self._handle_elevenlabs_streaming(
+                payload, text, encoding, pipeline_start
+            )
+            return
+
         use_ws = provider == "voiceai" and settings.VOICEAI_USE_WEBSOCKET
         use_streaming = (
             provider == "voiceai" and settings.VOICEAI_USE_STREAMING and not use_ws
@@ -264,6 +271,69 @@ class TTSWorker(BaseConsumer):
                 elapsed_ms,
             )
 
+    async def _handle_elevenlabs_streaming(
+        self,
+        payload: Any,
+        text: str,
+        encoding: str,
+        pipeline_start: float,
+    ) -> None:
+        """Handle ElevenLabs HTTP streaming path."""
+        accumulated_bytes = bytearray()
+        sample_rate = 24000
+
+        async for chunk_data in get_elevenlabs_tts_service().synthesize_stream(
+            text=text,
+            language=payload.target_language,
+            encoding=encoding,
+        ):
+            chunk_bytes = chunk_data["audio_bytes"]
+            sample_rate = chunk_data["sample_rate"]
+            accumulated_bytes.extend(chunk_bytes)
+
+            chunk_b64 = base64.b64encode(chunk_bytes).decode("ascii")
+            synth_payload = SynthesizedAudioPayload(
+                room_id=payload.room_id,
+                user_id=payload.user_id,
+                sequence_number=payload.sequence_number,
+                audio_data=chunk_b64,
+                target_language=payload.target_language,
+                sample_rate=sample_rate,
+                encoding=AudioEncoding(encoding),
+            )
+            synth_event = SynthesizedAudioEvent(payload=synth_payload)
+            try:
+                await self._publish_audio_to_redis(synth_event)
+            except Exception as redis_err:
+                logger.warning("Redis audio egress publish failed: %s", redis_err)
+
+        if accumulated_bytes:
+            full_audio_b64 = base64.b64encode(accumulated_bytes).decode("ascii")
+            final_payload = SynthesizedAudioPayload(
+                room_id=payload.room_id,
+                user_id=payload.user_id,
+                sequence_number=payload.sequence_number,
+                audio_data=full_audio_b64,
+                target_language=payload.target_language,
+                sample_rate=sample_rate,
+                encoding=AudioEncoding(encoding),
+            )
+            final_event = SynthesizedAudioEvent(payload=final_payload)
+            await self._producer.send(
+                AUDIO_SYNTHESIZED, final_event, key=payload.room_id
+            )
+
+            elapsed_ms = (time.monotonic() - pipeline_start) * 1000
+            logger.info(
+                "TTS (ElevenLabs Stream Final): seq=%d room=%s lang=%s "
+                "provider=elevenlabs audio_size=%d latency=%.1fms",
+                payload.sequence_number,
+                payload.room_id,
+                payload.target_language,
+                len(accumulated_bytes),
+                elapsed_ms,
+            )
+
     async def _handle_batch_synthesis(
         self,
         payload: Any,
@@ -344,6 +414,11 @@ class TTSWorker(BaseConsumer):
                 metadata.
         """
         provider = (provider or settings.ACTIVE_TTS_PROVIDER).lower()
+
+        if provider == "elevenlabs":
+            return await get_elevenlabs_tts_service().synthesize(
+                text, language=language, encoding=encoding
+            )
 
         if provider == "deepgram":
             return await get_deepgram_tts_service().synthesize(

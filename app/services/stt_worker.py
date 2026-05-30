@@ -11,6 +11,7 @@ import time
 from typing import Any
 
 from app.external_services.deepgram.service import get_deepgram_stt_service
+from app.external_services.elevenlabs_stt.service import get_elevenlabs_stt_service
 from app.kafka.consumer import BaseConsumer
 from app.kafka.schemas import BaseEvent
 from app.kafka.topics import AUDIO_RAW, TEXT_ORIGINAL
@@ -85,12 +86,214 @@ class STTWorker(BaseConsumer):
 
         from app.core.config import settings
 
-        use_streaming = settings.DEEPGRAM_USE_STREAMING and settings.DEEPGRAM_API_KEY
+        provider = settings.ACTIVE_STT_PROVIDER.lower()
+        try:
+            await self._dispatch_stt_provider(
+                provider, payload, buffer_key, audio_bytes
+            )
+        except Exception as primary_err:
+            if not settings.STT_FALLBACK_ENABLED:
+                raise
+            fallback = settings.STT_FALLBACK_PROVIDER.lower()
+            if fallback == provider:
+                raise
+            logger.warning(
+                "Primary STT provider '%s' failed: %s. Falling back to '%s'.",
+                provider,
+                primary_err,
+                fallback,
+            )
+            await self._dispatch_stt_provider(
+                fallback, payload, buffer_key, audio_bytes
+            )
 
-        if use_streaming:
-            await self._handle_streaming(payload, buffer_key, audio_bytes)
+    async def _dispatch_stt_provider(
+        self, provider: str, payload: Any, buffer_key: str, audio_bytes: bytes
+    ) -> None:
+        from app.core.config import settings
+
+        if provider == "elevenlabs":
+            use_streaming = settings.ELEVENLABS_STT_USE_STREAMING and bool(
+                settings.ELEVEN_LABS_API_KEY
+            )
+            if use_streaming:
+                await self._handle_elevenlabs_streaming(
+                    payload, buffer_key, audio_bytes
+                )
+            else:
+                await self._handle_elevenlabs_batch(payload, buffer_key, audio_bytes)
+        else:  # deepgram (default)
+            use_streaming = bool(
+                settings.DEEPGRAM_USE_STREAMING and settings.DEEPGRAM_API_KEY
+            )
+            if use_streaming:
+                await self._handle_streaming(payload, buffer_key, audio_bytes)
+            else:
+                await self._handle_batch(payload, buffer_key, audio_bytes)
+
+    async def _handle_elevenlabs_streaming(
+        self, payload: Any, buffer_key: str, audio_bytes: bytes
+    ) -> None:
+        """Stream raw audio chunks to ElevenLabs WebSocket."""
+        from app.core.config import settings
+
+        conn = self._streaming_connections.get(buffer_key)
+        try:
+            if not conn:
+
+                async def on_transcript(
+                    transcript_text: str, is_final: bool, confidence: float
+                ) -> None:
+                    await self._on_streaming_transcript(
+                        payload, buffer_key, transcript_text, is_final, confidence
+                    )
+
+                from app.external_services.elevenlabs_stt.streaming import (
+                    ElevenLabsStreamingSTT,
+                )
+
+                if not settings.ELEVEN_LABS_API_KEY:
+                    raise ValueError(
+                        "ELEVEN_LABS_API_KEY must be set for ElevenLabs streaming STT"
+                    )
+
+                conn = ElevenLabsStreamingSTT(
+                    api_key=settings.ELEVEN_LABS_API_KEY,
+                    room_id=payload.room_id,
+                    user_id=payload.user_id,
+                    on_transcript=on_transcript,
+                    language=payload.source_language,
+                    model=settings.ELEVENLABS_STT_REALTIME_MODEL,
+                    sample_rate=payload.sample_rate,
+                )
+                self._streaming_connections[buffer_key] = conn
+                await conn.connect()
+
+            await conn.send_audio(audio_bytes)
+        except Exception as e:
+            logger.error(
+                "Error in ElevenLabs streaming connection for %s: %s",
+                buffer_key,
+                e,
+            )
+            if conn:
+                task = asyncio.create_task(conn.close())
+                self._background_tasks.add(task)
+                task.add_done_callback(self._background_tasks.discard)
+            self._streaming_connections.pop(buffer_key, None)
+
+    async def _handle_elevenlabs_batch(
+        self, payload: Any, buffer_key: str, audio_bytes: bytes
+    ) -> None:
+        """Buffer raw audio chunks and call ElevenLabs batch transcription."""
+        from app.core.config import settings
+
+        pipeline_start = time.monotonic()
+
+        if buffer_key not in self._audio_buffers:
+            self._audio_buffers[buffer_key] = []
+
+        self._audio_buffers[buffer_key].append(audio_bytes)
+
+        if len(self._audio_buffers[buffer_key]) < self.BUFFER_SIZE:
+            return
+
+        full_audio = b"".join(self._audio_buffers[buffer_key])
+        self._audio_buffers[buffer_key] = []
+
+        if not settings.ELEVEN_LABS_API_KEY:
+            logger.info("ELEVEN_LABS_API_KEY not set. Mocking ElevenLabs STT response.")
+            result: dict[str, Any] = {
+                "text": "Hello, this is a simulated ElevenLabs transcription.",
+                "detected_language": payload.source_language,
+                "confidence": 1.0,
+            }
         else:
-            await self._handle_batch(payload, buffer_key, audio_bytes)
+            stt_service = get_elevenlabs_stt_service()
+            result = await stt_service.transcribe(
+                full_audio,
+                language=payload.source_language,
+                sample_rate=payload.sample_rate,
+                encoding=payload.encoding.value,
+            )
+
+        text = result.get("text", "").strip()
+        if not text:
+            return
+
+        transcription_payload = TranscriptionPayload(
+            room_id=payload.room_id,
+            user_id=payload.user_id,
+            sequence_number=payload.sequence_number,
+            text=text,
+            source_language=result.get("detected_language", payload.source_language),
+            is_final=True,
+            confidence=result.get("confidence", 0.0),
+        )
+        transcription_event = TranscriptionEvent(payload=transcription_payload)
+
+        await self._producer.send(
+            TEXT_ORIGINAL, transcription_event, key=payload.room_id
+        )
+
+        try:
+            from app.services.connection_manager import get_connection_manager
+
+            manager = get_connection_manager()
+            task = asyncio.create_task(
+                manager.broadcast_to_room(
+                    payload.room_id,
+                    {
+                        "type": "active_speaker_changed",
+                        "user_id": payload.user_id,
+                    },
+                )
+            )
+            self._background_tasks.add(task)
+            task.add_done_callback(self._background_tasks.discard)
+        except Exception as e:
+            logger.error("Failed to broadcast active speaker: %s", e)
+
+        try:
+            import json as _json
+
+            from app.modules.auth.token_store import _get_redis_client
+
+            participants = await self._state.get_participants(payload.room_id)
+            speaker_name = participants.get(payload.user_id, {}).get(
+                "display_name", "Speaker"
+            )
+
+            redis = _get_redis_client()
+            caption_msg = {
+                "event": "caption",
+                "type": "original",
+                "speaker_id": payload.user_id,
+                "speaker_name": speaker_name,
+                "text": text,
+                "source_language": transcription_payload.source_language,
+                "is_final": True,
+                "sequence_number": payload.sequence_number,
+                "timestamp_ms": int(time.time() * 1000),
+            }
+            await redis.publish(
+                f"pipeline:captions:{payload.room_id}",
+                _json.dumps(caption_msg),
+            )
+        except Exception as redis_err:
+            logger.warning("Redis caption publish failed: %s", redis_err)
+
+        elapsed_ms = (time.monotonic() - pipeline_start) * 1000
+        logger.info(
+            "STT (ElevenLabs Batch): seq=%d room=%s user=%s "
+            "text='%s' confidence=%.2f latency=%.1fms",
+            payload.sequence_number,
+            payload.room_id,
+            payload.user_id,
+            text,
+            result.get("confidence", 0.0),
+            elapsed_ms,
+        )
 
     async def _handle_streaming(
         self, payload: Any, buffer_key: str, audio_bytes: bytes

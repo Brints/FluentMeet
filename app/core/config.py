@@ -66,6 +66,7 @@ class Settings(BaseSettings):
     DEEPL_API_KEY: str | None = None
     VOICE_AI_API_KEY: str | None = None
     OPENAI_API_KEY: str | None = None
+    ELEVEN_LABS_API_KEY: str | None = None
 
     # Google OAuth
     GOOGLE_CLIENT_ID: str | None = None
@@ -101,12 +102,31 @@ class Settings(BaseSettings):
     DEEPGRAM_TTS_API_URL: str = "https://api.deepgram.com/v1/speak"
     DEEPGRAM_TTS_MODEL: str = "aura-2-thalia"
 
+    # AI Pipeline — STT (ElevenLabs)
+    ELEVENLABS_STT_API_URL: str = "https://api.elevenlabs.io/v1/speech-to-text"
+    ELEVENLABS_STT_WS_URL: str = "wss://api.elevenlabs.io/v1/speech-to-text/realtime"
+    ELEVENLABS_STT_MODEL: str = "scribe_v2"
+    ELEVENLABS_STT_REALTIME_MODEL: str = "scribe_v2_realtime"
+    ELEVENLABS_STT_USE_STREAMING: bool = True
+
+    # AI Pipeline — TTS (ElevenLabs)
+    ELEVENLABS_TTS_API_URL: str = "https://api.elevenlabs.io/v1/text-to-speech"
+    ELEVENLABS_TTS_MODEL: str = "eleven_flash_v2_5"
+    ELEVENLABS_TTS_VOICE_ID: str = "JBFqnCBsd6RMkjVDRZzb"
+    ELEVENLABS_TTS_OUTPUT_FORMAT: str = "pcm_24000"
+    ELEVENLABS_TTS_USE_STREAMING: bool = True
+
     # AI Pipeline — Audio Settings
     PIPELINE_AUDIO_SAMPLE_RATE: int = 24000
     PIPELINE_AUDIO_ENCODING: str = "linear16"  # "linear16" or "opus"
-    ACTIVE_TTS_PROVIDER: str = "deepgram"  # "deepgram", "openai", or "voiceai"
+    ACTIVE_TTS_PROVIDER: str = (
+        "elevenlabs"  # "elevenlabs", "deepgram", "openai", or "voiceai"
+    )
     TTS_FALLBACK_PROVIDER: str = "voiceai"  # fallback when primary fails
     TTS_FALLBACK_ENABLED: bool = True  # auto-fallback on provider failure
+    ACTIVE_STT_PROVIDER: str = "deepgram"  # "deepgram" or "elevenlabs"
+    STT_FALLBACK_PROVIDER: str = "elevenlabs"  # fallback when primary fails
+    STT_FALLBACK_ENABLED: bool = True  # auto-fallback on provider failure
 
     # Mailgun Email Service
     MAILGUN_API_KEY: str | None = None
