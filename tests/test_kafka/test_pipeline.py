@@ -320,3 +320,148 @@ async def test_tts_worker_handle_voiceai_websocket(
 
         decoded = base64.b64decode(synth_event.payload.audio_data)
         assert decoded == b"chunk1chunk2"
+
+
+@pytest.mark.asyncio
+async def test_tts_worker_handle_elevenlabs(mock_producer, base_translation_event):
+    worker = TTSWorker(producer=mock_producer)
+
+    with (
+        patch(
+            "app.services.tts_worker.get_elevenlabs_tts_service"
+        ) as mock_get_elevenlabs,
+        patch("app.services.tts_worker.settings") as mock_settings,
+        patch("app.modules.auth.token_store._get_redis_client") as mock_get_redis,
+    ):
+        mock_settings.ACTIVE_TTS_PROVIDER = "elevenlabs"
+        mock_settings.ELEVENLABS_TTS_USE_STREAMING = False
+        mock_settings.PIPELINE_AUDIO_ENCODING = "linear16"
+
+        mock_elevenlabs = AsyncMock()
+        mock_elevenlabs.synthesize.return_value = {
+            "audio_bytes": b"elevenlabs_batch_bytes",
+            "sample_rate": 24000,
+        }
+        mock_get_elevenlabs.return_value = mock_elevenlabs
+
+        redis_mock = MagicMock()
+        redis_mock.publish = AsyncMock()
+        mock_get_redis.return_value = redis_mock
+
+        await worker.handle(base_translation_event)
+
+        mock_elevenlabs.synthesize.assert_called_once_with(
+            "Bonjour le monde",
+            language="fr",
+            encoding="linear16",
+        )
+
+        mock_producer.send.assert_called_once()
+        args, _kwargs = mock_producer.send.call_args
+        assert args[0] == "audio.synthesized"
+
+        synth_event = args[1]
+        assert synth_event.payload.sample_rate == 24000
+        decoded = base64.b64decode(synth_event.payload.audio_data)
+        assert decoded == b"elevenlabs_batch_bytes"
+
+
+@pytest.mark.asyncio
+async def test_tts_worker_handle_elevenlabs_streaming(
+    mock_producer, base_translation_event
+):
+    worker = TTSWorker(producer=mock_producer)
+
+    with (
+        patch(
+            "app.services.tts_worker.get_elevenlabs_tts_service"
+        ) as mock_get_elevenlabs,
+        patch("app.services.tts_worker.settings") as mock_settings,
+        patch("app.modules.auth.token_store._get_redis_client") as mock_get_redis,
+    ):
+        mock_settings.ACTIVE_TTS_PROVIDER = "elevenlabs"
+        mock_settings.ELEVENLABS_TTS_USE_STREAMING = True
+        mock_settings.PIPELINE_AUDIO_ENCODING = "linear16"
+
+        mock_elevenlabs = AsyncMock()
+
+        async def mock_generator(*_args, **_kwargs):
+            yield {"audio_bytes": b"el_chunk1", "sample_rate": 24000}
+            yield {"audio_bytes": b"el_chunk2", "sample_rate": 24000}
+
+        mock_elevenlabs.synthesize_stream = mock_generator
+        mock_get_elevenlabs.return_value = mock_elevenlabs
+
+        redis_mock = MagicMock()
+        redis_mock.publish = AsyncMock()
+        mock_get_redis.return_value = redis_mock
+
+        await worker.handle(base_translation_event)
+
+        assert redis_mock.publish.call_count == 2
+
+        mock_producer.send.assert_called_once()
+        args, _kwargs = mock_producer.send.call_args
+        assert args[0] == "audio.synthesized"
+
+        synth_event = args[1]
+        assert synth_event.payload.sample_rate == 24000
+        decoded = base64.b64decode(synth_event.payload.audio_data)
+        assert decoded == b"el_chunk1el_chunk2"
+
+
+@pytest.mark.asyncio
+async def test_stt_worker_handle_elevenlabs_batch(
+    mock_producer, base_audio_chunk_event
+):
+    worker = STTWorker(producer=mock_producer)
+
+    with (
+        patch(
+            "app.services.stt_worker.get_elevenlabs_stt_service"
+        ) as mock_get_elevenlabs_stt,
+        patch("app.core.config.settings") as mock_settings,
+        patch("app.services.connection_manager.get_connection_manager") as mock_get_cm,
+        patch("app.modules.auth.token_store._get_redis_client") as mock_get_redis,
+    ):
+        mock_settings.ACTIVE_STT_PROVIDER = "elevenlabs"
+        mock_settings.ELEVEN_LABS_API_KEY = "fake-key"
+        mock_settings.ELEVENLABS_STT_USE_STREAMING = False
+        mock_settings.STT_FALLBACK_ENABLED = True
+        mock_settings.STT_FALLBACK_PROVIDER = "deepgram"
+
+        mock_stt_svc = AsyncMock()
+        mock_stt_svc.transcribe.return_value = {
+            "text": "Hello ElevenLabs Scribe",
+            "confidence": 0.97,
+            "detected_language": "en",
+        }
+        mock_get_elevenlabs_stt.return_value = mock_stt_svc
+
+        redis_mock = MagicMock()
+        redis_mock.publish = AsyncMock()
+        mock_get_redis.return_value = redis_mock
+
+        cm_mock = MagicMock()
+        cm_mock.broadcast_to_room = AsyncMock()
+        mock_get_cm.return_value = cm_mock
+
+        mock_state = AsyncMock()
+        mock_state.get_participants.return_value = {
+            "user456": {"display_name": "Speaker Name"}
+        }
+        worker._state = mock_state
+
+        for _ in range(STTWorker.BUFFER_SIZE):
+            await worker.handle(base_audio_chunk_event)
+
+        mock_stt_svc.transcribe.assert_called_once_with(
+            b"fake_audio" * STTWorker.BUFFER_SIZE,
+            language="en",
+            sample_rate=16000,
+            encoding="linear16",
+        )
+        mock_producer.send.assert_called_once()
+        args, _ = mock_producer.send.call_args
+        assert args[0] == "text.original"
+        assert args[1].payload.text == "Hello ElevenLabs Scribe"
