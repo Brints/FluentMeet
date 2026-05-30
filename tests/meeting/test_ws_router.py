@@ -63,8 +63,14 @@ def mock_redis_client():
             pass
 
         async def mock_listen():
-            if False:
-                yield
+            import asyncio
+
+            try:
+                while True:
+                    await asyncio.sleep(3600)
+                    yield
+            except asyncio.CancelledError:
+                pass
 
         pubsub_mock.subscribe = mock_subscribe
         pubsub_mock.unsubscribe = mock_unsubscribe
@@ -123,4 +129,9 @@ def test_audio_websocket_ingest(
         websocket.send_bytes(b"fake_audio_chunk")
         time.sleep(0.1)  # Yield to event loop for background tasks to process
 
-    mock_audio_ingest.reset_sequence.assert_called_once_with("room1:user1")
+    mock_audio_ingest.publish_audio_chunk.assert_called_once_with(
+        room_id="room1",
+        user_id="user1",
+        audio_bytes=b"fake_audio_chunk",
+        source_language="en",
+    )

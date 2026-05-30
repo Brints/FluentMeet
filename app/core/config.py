@@ -97,10 +97,16 @@ class Settings(BaseSettings):
     VOICEAI_DELIVERY_MODE: str = "paced"  # "paced" or "raw"
     VOICEAI_USE_WEBSOCKET: bool = False  # Feature flag for WebSocket TTS
 
+    # AI Pipeline — TTS (Deepgram Aura-2)
+    DEEPGRAM_TTS_API_URL: str = "https://api.deepgram.com/v1/speak"
+    DEEPGRAM_TTS_MODEL: str = "aura-2-thalia"
+
     # AI Pipeline — Audio Settings
     PIPELINE_AUDIO_SAMPLE_RATE: int = 24000
     PIPELINE_AUDIO_ENCODING: str = "linear16"  # "linear16" or "opus"
-    ACTIVE_TTS_PROVIDER: str = "openai"  # "openai" or "voiceai"
+    ACTIVE_TTS_PROVIDER: str = "deepgram"  # "deepgram", "openai", or "voiceai"
+    TTS_FALLBACK_PROVIDER: str = "voiceai"  # fallback when primary fails
+    TTS_FALLBACK_ENABLED: bool = True  # auto-fallback on provider failure
 
     # Mailgun Email Service
     MAILGUN_API_KEY: str | None = None
