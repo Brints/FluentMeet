@@ -64,6 +64,7 @@ def mock_redis_client():
 
         async def mock_listen():
             import asyncio
+
             try:
                 while True:
                     await asyncio.sleep(3600)
@@ -134,4 +135,3 @@ def test_audio_websocket_ingest(
         audio_bytes=b"fake_audio_chunk",
         source_language="en",
     )
-
