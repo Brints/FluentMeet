@@ -1,10 +1,12 @@
 """TTS (Text-to-Speech) Kafka consumer worker.
 
 Consumes translated text from ``text.translated``, calls the configured
-TTS provider (OpenAI or Voice.ai), and publishes synthesized audio
-to ``audio.synthesized``.
+TTS provider (Deepgram, OpenAI, or Voice.ai), and publishes synthesized
+audio to ``audio.synthesized``.
 
 The active provider is controlled by ``settings.ACTIVE_TTS_PROVIDER``.
+Automatic fallback to ``settings.TTS_FALLBACK_PROVIDER`` when the primary
+provider fails (controlled by ``settings.TTS_FALLBACK_ENABLED``).
 """
 
 import base64
@@ -13,6 +15,7 @@ import time
 from typing import Any
 
 from app.core.config import settings
+from app.external_services.deepgram_tts.service import get_deepgram_tts_service
 from app.external_services.openai_tts.service import get_openai_tts_service
 from app.external_services.voiceai.service import get_voiceai_tts_service
 from app.external_services.voiceai.websocket_streaming import get_voiceai_ws_tts_service
@@ -53,6 +56,10 @@ class TTSWorker(BaseConsumer):
     async def handle(self, event: BaseEvent[Any]) -> None:
         """Process a translation: synthesize audio → publish.
 
+        Tries the configured primary provider first.  If it fails and
+        ``TTS_FALLBACK_ENABLED`` is ``True``, automatically retries with
+        the fallback provider.
+
         Args:
             event (BaseEvent[Any]): The deserialized wrapper containing the
                 TranslationPayload.
@@ -72,6 +79,42 @@ class TTSWorker(BaseConsumer):
 
         encoding = settings.PIPELINE_AUDIO_ENCODING
         provider = settings.ACTIVE_TTS_PROVIDER.lower()
+
+        try:
+            await self._dispatch_provider(
+                provider, payload, text, encoding, pipeline_start
+            )
+        except Exception as primary_err:
+            if not settings.TTS_FALLBACK_ENABLED:
+                raise
+
+            fallback = settings.TTS_FALLBACK_PROVIDER.lower()
+            if fallback == provider:
+                raise  # No point falling back to the same provider
+
+            logger.warning(
+                "Primary TTS provider '%s' failed for seq=%d: %s. "
+                "Falling back to '%s'.",
+                provider,
+                payload.sequence_number,
+                primary_err,
+                fallback,
+            )
+            # Fallback attempt — if this also fails, the exception
+            # propagates to BaseConsumer._process_with_retry as normal.
+            await self._dispatch_provider(
+                fallback, payload, text, encoding, pipeline_start
+            )
+
+    async def _dispatch_provider(
+        self,
+        provider: str,
+        payload: Any,
+        text: str,
+        encoding: str,
+        pipeline_start: float,
+    ) -> None:
+        """Route synthesis to the specified provider."""
         use_ws = provider == "voiceai" and settings.VOICEAI_USE_WEBSOCKET
         use_streaming = (
             provider == "voiceai" and settings.VOICEAI_USE_STREAMING and not use_ws
@@ -85,7 +128,9 @@ class TTSWorker(BaseConsumer):
             await self._handle_http_streaming(payload, text, encoding, pipeline_start)
             return
 
-        await self._handle_batch_synthesis(payload, text, encoding, pipeline_start)
+        await self._handle_batch_synthesis(
+            payload, text, encoding, pipeline_start, provider=provider
+        )
 
     async def _handle_ws_streaming(
         self,
@@ -225,13 +270,18 @@ class TTSWorker(BaseConsumer):
         text: str,
         encoding: str,
         pipeline_start: float,
+        *,
+        provider: str | None = None,
     ) -> None:
         """Handle standard non-streaming batch synthesis path."""
+        provider = provider or settings.ACTIVE_TTS_PROVIDER.lower()
+
         # 1. Call the configured TTS provider (Non-streaming)
         audio_result = await self._synthesize(
             text=text,
             language=payload.target_language,
             encoding=encoding,
+            provider=provider,
         )
 
         audio_bytes = audio_result["audio_bytes"]
@@ -267,24 +317,38 @@ class TTSWorker(BaseConsumer):
             payload.sequence_number,
             payload.room_id,
             payload.target_language,
-            settings.ACTIVE_TTS_PROVIDER,
+            provider,
             len(audio_bytes),
             elapsed_ms,
         )
 
-    async def _synthesize(self, *, text: str, language: str, encoding: str) -> dict:
-        """Dispatch to the active TTS provider.
+    async def _synthesize(
+        self,
+        *,
+        text: str,
+        language: str,
+        encoding: str,
+        provider: str | None = None,
+    ) -> dict:
+        """Dispatch to the specified TTS provider.
 
         Args:
             text (str): The translated native text to synthesize.
             language (str): The language code of the text.
             encoding (str): The desired output audio format encoding.
+            provider (str | None): Provider name override. Falls back to
+                ``settings.ACTIVE_TTS_PROVIDER``.
 
         Returns:
             dict: A dictionary containing 'audio_bytes' and the 'sample_rate'
                 metadata.
         """
-        provider = settings.ACTIVE_TTS_PROVIDER.lower()
+        provider = (provider or settings.ACTIVE_TTS_PROVIDER).lower()
+
+        if provider == "deepgram":
+            return await get_deepgram_tts_service().synthesize(
+                text, language=language, encoding=encoding
+            )
 
         if provider == "voiceai":
             return await get_voiceai_tts_service().synthesize(

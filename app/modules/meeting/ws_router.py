@@ -134,7 +134,10 @@ async def audio_websocket(  # noqa: C901
     logger.info("Audio WS client connected: %s", sanitize_for_log(user_id))
 
     ingest_svc = get_audio_ingest_service()
-    ingest_svc.reset_sequence(f"{room_code}:{user_id}")
+    # NOTE: Do NOT reset the sequence counter on reconnect.
+    # Resetting causes sequence number conflicts when a client rapidly
+    # reconnects.  The counter continues monotonically; it is only
+    # reset when the participant explicitly leaves or the meeting ends.
 
     async def ingest_task() -> None:
         """Reads WS binary frames (or Base64 text), packages, and sends to Kafka."""
@@ -283,13 +286,53 @@ async def audio_websocket(  # noqa: C901
         logger.info("Egress ready — starting audio ingest")
         await ingest_task()
 
+    async def keepalive_task() -> None:
+        """Sends WebSocket ping frames every 20s to keep the connection alive."""
+        try:
+            while True:
+                await asyncio.sleep(20)
+                try:
+                    await websocket.send_bytes(b"")
+                except Exception:
+                    break
+        except asyncio.CancelledError:
+            pass
+
+    async def heartbeat_task() -> None:
+        """Sends pipeline heartbeat JSON messages every 15s.
+
+        This allows the frontend to distinguish between 'no one is
+        speaking' and 'pipeline is broken' — the watchdog can be
+        cleared on heartbeat receipt.
+        """
+        import json as _json
+
+        try:
+            while True:
+                await asyncio.sleep(15)
+                try:
+                    await websocket.send_text(
+                        _json.dumps(
+                            {
+                                "type": "pipeline_heartbeat",
+                                "ts": int(time.time() * 1000),
+                            }
+                        )
+                    )
+                except Exception:
+                    break
+        except asyncio.CancelledError:
+            pass
+
     task1 = asyncio.create_task(guarded_ingest_task())
     task2 = asyncio.create_task(egress_task())
+    task3 = asyncio.create_task(keepalive_task())
+    task4 = asyncio.create_task(heartbeat_task())
 
     try:
-        # Run until either task fails or disconnects
+        # Run until any task fails or disconnects
         _done, pending = await asyncio.wait(
-            [task1, task2], return_when=asyncio.FIRST_COMPLETED
+            [task1, task2, task3, task4], return_when=asyncio.FIRST_COMPLETED
         )
         # Cancel whatever is still running
         for t in pending:
