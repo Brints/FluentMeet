@@ -49,6 +49,7 @@ class ConnectionManager:
             user_id (str): The connecting participant's user id.
             websocket (WebSocket): The active websocket connection.
         """
+        user_id = user_id.lower().strip()
         if room_code not in self.active_connections:
             self.active_connections[room_code] = {}
             # Start pub/sub listener for the room
@@ -68,6 +69,7 @@ class ConnectionManager:
             room_code (str): The room the user is disconnecting from.
             user_id (str): The disconnecting participant's user id.
         """
+        user_id = user_id.lower().strip()
         if room_code in self.active_connections:
             self.active_connections[room_code].pop(user_id, None)
             logger.info(
@@ -166,6 +168,8 @@ class ConnectionManager:
 
                 if msg_type == "broadcast":
                     sender_id = payload.get("sender_id")
+                    if isinstance(sender_id, str):
+                        sender_id = sender_id.lower().strip()
                     for user_id, ws in list(self.active_connections[room_code].items()):
                         # Don't echo back to the sender
                         if user_id != sender_id:
@@ -179,6 +183,8 @@ class ConnectionManager:
 
                 elif msg_type == "unicast":
                     target_id = payload.get("target_user_id")
+                    if isinstance(target_id, str):
+                        target_id = target_id.lower().strip()
                     target_ws = self.active_connections[room_code].get(target_id)
                     if target_ws:
                         try:
@@ -203,6 +209,7 @@ class ConnectionManager:
             user_id (str): The connecting waitlisted participant's user id.
             websocket (WebSocket): The active websocket connection.
         """
+        user_id = user_id.lower().strip()
         if room_code not in self.lobby_connections:
             self.lobby_connections[room_code] = {}
             # Start lobby pub/sub listener for the room
@@ -222,6 +229,7 @@ class ConnectionManager:
             room_code (str): The room the user is disconnecting from.
             user_id (str): The disconnecting waitlisted user id.
         """
+        user_id = user_id.lower().strip()
         if room_code in self.lobby_connections:
             self.lobby_connections[room_code].pop(user_id, None)
             logger.info(
@@ -344,6 +352,7 @@ class ConnectionManager:
         target_id = payload.get("target_user_id")
         if not isinstance(target_id, str):
             return
+        target_id = target_id.lower().strip()
         target_ws = self.lobby_connections[room_code].get(target_id)
         if target_ws:
             try:

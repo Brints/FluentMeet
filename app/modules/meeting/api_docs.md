@@ -1,4 +1,4 @@
-# FluentMeet Meeting API Documentation
+# Spoken.ai Meeting API Documentation
 
 > **Base URL:** `/api/v1/meetings`
 > **Version:** 1.0 · **Protocol:** REST over HTTPS & WebSockets · **Content-Type:** `application/json`
@@ -38,7 +38,7 @@
 
 ## Overview
 
-The FluentMeet meeting module provides comprehensive meeting management, supporting:
+The Spoken.ai meeting module provides comprehensive meeting management, supporting:
 
 - **Room Management:** Creation, scheduling, retrieval, updates, and forced ending.
 - **Participant Tracking:** Identifying registered users and dynamic token-based guests.
