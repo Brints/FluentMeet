@@ -403,6 +403,27 @@ async def lobby_websocket(
     try:
         _ = await assert_lobby_participant(room_code, user_id)
     except Exception as e:
+        # Check if the user is already admitted to the meeting room
+        # (present in participants list)
+        try:
+            from app.modules.meeting.state import MeetingStateService
+
+            state_service = MeetingStateService()
+            participants = await state_service.get_participants(room_code)
+            normalized_user_id = user_id.lower().strip()
+            normalized_participants = {k.lower().strip() for k in participants}
+            if normalized_user_id in normalized_participants:
+                await websocket.accept()
+                await websocket.send_json({"type": "admitted", "room_code": room_code})
+                await websocket.close(code=1000)
+                return
+        except Exception as inner_e:
+            logger.error(
+                "Error checking alternative participant admission in "
+                "lobby WebSocket: %s",
+                inner_e,
+            )
+
         await websocket.close(code=1008, reason=str(e))
         return
 

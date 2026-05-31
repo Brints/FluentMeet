@@ -510,6 +510,13 @@ class MeetingService:
 
     async def admit_user(self, host: User, room_code: str, target_user_id: str) -> None:
         """Host admits a specific user from the lobby into the active room."""
+        try:
+            target_uuid = uuid.UUID(target_user_id)
+            normalized_user_id = str(target_uuid)
+        except ValueError:
+            target_uuid = uuid.uuid5(uuid.NAMESPACE_DNS, target_user_id)
+            normalized_user_id = target_user_id
+
         room = self.repo.get_room_by_code(room_code)
         if not room or room.host_id != host.id:
             raise ForbiddenException(message="Only the host can admit participants.")
@@ -517,7 +524,7 @@ class MeetingService:
         # Fetch display_name and languages BEFORE admit_from_lobby
         # removes the entry from the lobby hash.
         lobby = await self.state.get_lobby(room_code)
-        lobby_data = lobby.get(target_user_id)
+        lobby_data = lobby.get(normalized_user_id)
         if not lobby_data:
             raise BadRequestException(message="User is not in the lobby.")
 
@@ -525,17 +532,12 @@ class MeetingService:
         listening_language = lobby_data.get("language")
         speaking_language = lobby_data.get("speaking_language")
 
-        was_in_lobby = await self.state.admit_from_lobby(room_code, target_user_id)
+        was_in_lobby = await self.state.admit_from_lobby(room_code, normalized_user_id)
 
         if not was_in_lobby:
             raise BadRequestException(message="User is not in the lobby.")
 
         # Find or create Participant, add to active room, persist to DB
-        try:
-            target_uuid = uuid.UUID(target_user_id)
-        except ValueError:
-            target_uuid = uuid.uuid5(uuid.NAMESPACE_DNS, target_user_id)
-
         user = self.repo.db.get(User, target_uuid)
 
         # Check if participant already exists in DB
@@ -566,7 +568,7 @@ class MeetingService:
         cm = get_connection_manager()
         # Send admission message via lobby connection channel where user is listening
         await cm.send_to_lobby_user(
-            room_code, target_user_id, {"type": "admitted", "room_code": room_code}
+            room_code, normalized_user_id, {"type": "admitted", "room_code": room_code}
         )
 
         # Notify existing participants that the newly admitted user has joined.
@@ -576,7 +578,7 @@ class MeetingService:
             room_code,
             {
                 "type": "user_joined",
-                "user_id": target_user_id,
+                "user_id": normalized_user_id,
                 "display_name": display_name,
                 "role": (
                     ParticipantRole.PARTICIPANT.value
@@ -584,7 +586,7 @@ class MeetingService:
                     else ParticipantRole.GUEST.value
                 ),
             },
-            sender_id=target_user_id,  # Exclude the admitted user
+            sender_id=normalized_user_id,  # Exclude the admitted user
         )
 
     async def admit_all_users(self, host: User, room_code: str) -> int:
@@ -600,7 +602,14 @@ class MeetingService:
         cm = get_connection_manager()
         admitted_count = 0
 
-        for user_id, lobby_data in lobby.items():
+        for raw_user_id, lobby_data in lobby.items():
+            try:
+                target_uuid = uuid.UUID(raw_user_id)
+                user_id = str(target_uuid)
+            except ValueError:
+                target_uuid = uuid.uuid5(uuid.NAMESPACE_DNS, raw_user_id)
+                user_id = raw_user_id
+
             was_in_lobby = await self.state.admit_from_lobby(room_code, user_id)
             if not was_in_lobby:
                 continue
@@ -608,11 +617,6 @@ class MeetingService:
             display_name = lobby_data.get("display_name", "")
             listening_language = lobby_data.get("language")
             speaking_language = lobby_data.get("speaking_language")
-
-            try:
-                target_uuid = uuid.UUID(user_id)
-            except ValueError:
-                target_uuid = uuid.uuid5(uuid.NAMESPACE_DNS, user_id)
 
             user = self.repo.db.get(User, target_uuid)
 
@@ -665,20 +669,27 @@ class MeetingService:
         self, host: User, room_code: str, target_user_id: str
     ) -> None:
         """Host rejects a specific user from the lobby."""
+        try:
+            target_uuid = uuid.UUID(target_user_id)
+            normalized_user_id = str(target_uuid)
+        except ValueError:
+            target_uuid = uuid.uuid5(uuid.NAMESPACE_DNS, target_user_id)
+            normalized_user_id = target_user_id
+
         room = self.repo.get_room_by_code(room_code)
         if not room or room.host_id != host.id:
             raise ForbiddenException(message="Only the host can reject participants.")
 
         lobby = await self.state.get_lobby(room_code)
-        if target_user_id not in lobby:
+        if normalized_user_id not in lobby:
             raise BadRequestException(message="User is not in the lobby.")
 
-        await self.state.remove_from_lobby(room_code, target_user_id)
+        await self.state.remove_from_lobby(room_code, normalized_user_id)
 
         cm = get_connection_manager()
         await cm.send_to_lobby_user(
             room_code,
-            target_user_id,
+            normalized_user_id,
             {"type": "rejected", "reason": "Host denied entry"},
         )
 
@@ -695,7 +706,14 @@ class MeetingService:
         cm = get_connection_manager()
         rejected_count = 0
 
-        for user_id in list(lobby.keys()):
+        for raw_user_id in list(lobby.keys()):
+            try:
+                target_uuid = uuid.UUID(raw_user_id)
+                user_id = str(target_uuid)
+            except ValueError:
+                target_uuid = uuid.uuid5(uuid.NAMESPACE_DNS, raw_user_id)
+                user_id = raw_user_id
+
             await self.state.remove_from_lobby(room_code, user_id)
             await cm.send_to_lobby_user(
                 room_code,
